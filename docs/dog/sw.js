@@ -1,4 +1,4 @@
-const CACHE = "ledger-dog-20260928232917";
+const CACHE = "ledger-dog-20260928234800";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", e => {
@@ -8,6 +8,12 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
+  if (url.pathname.endsWith("/prices.json")) {
+    // 股價：先拿最新的，離線時用上次的
+    e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; })
+      .catch(() => caches.match(e.request)));
+    return;
+  }
   if (e.request.mode === "navigate" || (url.origin === location.origin && url.pathname.endsWith(".html"))) {
     // 頁面：先試網路拿新版，離線時用快取
     e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put("./index.html", c)); return r; })

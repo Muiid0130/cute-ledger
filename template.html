@@ -36,6 +36,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px dashed
 /* header */
 header.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .brand{display:flex;align-items:center;gap:8px}
+.mascot{display:block;object-fit:cover;border:2px solid var(--ink);border-radius:24%}
 .brand .mascot{width:46px;height:46px}
 .brand h1{margin:0;font-size:22px;line-height:1.1}
 .brand small{display:block;font-size:12px;color:var(--ink-soft)}
@@ -317,27 +318,7 @@ function defaultFixed(){
 }
 const ic = (n,extra="") => `<svg class="ic ${extra}" viewBox="0 0 32 32" aria-hidden="true"><g filter="url(#rough)">${I[n]||I.bag}</g></svg>`;
 
-const MASCOT = THEME==="cat" ? `
-<svg viewBox="0 0 64 64" class="mascot" aria-hidden="true"><g stroke="var(--ink)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" filter="url(#rough)">
-<path d="M14 27L12 8l15 8z" fill="#fff"/><path d="M50 27l2-19-15 8z" fill="#fff"/>
-<path d="M16.5 22l-1-9 7 4z" fill="#FFB8CB" stroke="none"/><path d="M47.5 22l1-9-7 4z" fill="#FFB8CB" stroke="none"/>
-<path d="M32 14c13 0 21 8 21 20 0 11-9 19-21 19S11 45 11 34c0-12 8-20 21-20z" fill="#fff"/>
-<path d="M28.5 16.5l1 4.5M32 15.5v5M35.5 16.5l-1 4.5" stroke="#FF8FB1"/>
-<path d="M20.5 32.5q3.5-3.5 7 0M36.5 32.5q3.5-3.5 7 0" fill="none"/>
-<path d="M30 37.2h4l-2 2.2z" fill="#FF8FB1"/>
-<path d="M32 39.5c-1 2-3.5 2.2-4.5.6M32 39.5c1 2 3.5 2.2 4.5.6" fill="none"/>
-<path d="M5 35.5l9 1.2M5.5 41l8.5-2M59 35.5l-9 1.2M58.5 41l-8.5-2" stroke-width="1.8" fill="none"/></g>
-<ellipse cx="19" cy="38" rx="3.4" ry="2" fill="#FFB8CB"/><ellipse cx="45" cy="38" rx="3.4" ry="2" fill="#FFB8CB"/></svg>` : `
-<svg viewBox="0 0 64 64" class="mascot" aria-hidden="true"><g stroke="var(--ink)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" filter="url(#rough)">
-<path d="M32 12c12 0 19 8 19 20 0 13-8 21-19 21s-19-8-19-21c0-12 7-20 19-20z" fill="#F7E4C6"/>
-<path d="M38 22c3-3 8-2 9 2s-2 8-6 7-5-6-3-9z" fill="#E4C193" stroke="none"/>
-<path d="M15 16c-6 1-10 11-8 19 1 5 6 5 8 1l3-14z" fill="#C99A6B"/><path d="M49 16c6 1 10 11 8 19-1 5-6 5-8 1l-3-14z" fill="#C99A6B"/>
-<ellipse cx="32" cy="42" rx="10.5" ry="7.5" fill="#FFF7EA"/>
-<path d="M28.8 37.5c1.8-1.3 4.6-1.3 6.4 0-.5 2.2-2 3.2-3.2 3.2s-2.7-1-3.2-3.2z" fill="var(--ink)"/>
-<path d="M32 40.7v2.3M32 43c-1.5 2-4 2-5.2.4M32 43c1.5 2 4 2 5.2.4" fill="none"/>
-<path d="M29.8 45.2c0 3.4 4.4 3.4 4.4 0" fill="#FF8FA3"/></g>
-<circle cx="24" cy="31" r="2.4" fill="var(--ink)"/><circle cx="40" cy="31" r="2.4" fill="var(--ink)"/><circle cx="24.8" cy="30.2" r=".8" fill="#fff"/><circle cx="40.8" cy="30.2" r=".8" fill="#fff"/>
-<ellipse cx="18.5" cy="38" rx="3" ry="1.8" fill="#FFB3C1"/><ellipse cx="45.5" cy="38" rx="3" ry="1.8" fill="#FFB3C1"/></svg>`;
+const MASCOT = `<img class="mascot" src="__MASCOT__" alt="">`;
 
 /* ---------------- utilities ---------------- */
 const pad = n => String(n).padStart(2,"0");
@@ -391,7 +372,7 @@ function sampleState(){
   for(let m=1;m<NOW.getMonth()+1;m++){ v += 3000 + ((m*6151)%3000) - (m===4?5000:0); log[`${y}-${pad(m)}`]=v; }
   const shift = 78000 - v; for(const k in log) log[k] += shift;
   const portLog = {};
-  for(let i=20;i>=1;i--){ const d=new Date(NOW); d.setDate(d.getDate()-i); portLog[`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`] = 94500 + Math.round(Math.sin(i/2.5)*2200 + (20-i)*180); }
+  for(let i=20;i>=1;i--){ const d=new Date(NOW); d.setDate(d.getDate()-i); portLog[`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`] = 108000 + Math.round(Math.sin(i/2.5)*2200 + (20-i)*180); }
   return {
     v:2, sample:true,
     bags:[
@@ -410,8 +391,8 @@ function sampleState(){
       {id:"c3",name:"旅遊卡",last4:"5678",limit:60000,closeDay:25,payDay:10,paidTs:0,color:"#D6B8F2"},
     ],
     stocks:[
-      {id:uid(),sym:"0050",name:"元大台灣50",shares:200,cost:150,price:188.5,prev:186.2,ccy:"TWD"},
-      {id:uid(),sym:"2330",name:"台積電",shares:20,cost:820,price:1045,prev:1060,ccy:"TWD"},
+      {id:uid(),sym:"0050",name:"元大台灣50",shares:200,cost:95,price:112,prev:111.5,ccy:"TWD"},
+      {id:uid(),sym:"2330",name:"台積電",shares:20,cost:1800,price:2475,prev:2500,ccy:"TWD"},
       {id:uid(),sym:"VT",name:"全球股票 ETF",shares:10,cost:105,price:128.4,prev:127.9,ccy:"USD"},
     ],
     fx:{USD:30.5}, portLog,
@@ -483,6 +464,26 @@ async function boot(){
     syncNote = "已同步到你的帳號，換裝置也看得到，只有你看得到";
   }catch(e){ if(remote===null && MODE!=="app") syncNote="目前存在這台裝置的瀏覽器裡"; }
   autoFixed(); render();
+  if(MODE==="app") updatePrices();
+}
+async function updatePrices(){
+  try{
+    const r = await fetch("../prices.json", {cache:"no-store"});
+    if(!r.ok) return;
+    const data = await r.json(), q = data.quotes || {};
+    let changed = 0;
+    for(const st of S.stocks){
+      if(st.ccy!=="TWD") continue;
+      const hit = q[String(st.sym).trim().toUpperCase()];
+      if(!hit) continue;
+      const [close, prev, name] = hit;
+      if(close && (st.price!==close || (prev && st.prev!==prev))){ st.price=close; if(prev) st.prev=prev; changed++; }
+      if(!st.name && name) st.name = name;
+    }
+    const newDate = data.date || S.pricesDate;
+    if(changed || newDate!==S.pricesDate){ S.pricesDate = newDate; persist(); render(); }
+    if(changed) toast(`${TH.hi}！${changed} 檔台股已更新到 ${String(newDate).slice(5).replace("-","/")} 收盤價`);
+  }catch(e){ /* 離線時沿用上次價格 */ }
 }
 
 /* ---------------- derived numbers ---------------- */
@@ -779,7 +780,7 @@ function pageAssets(){
   </section>
   ${S.stocks.length?`<div class="foot" style="margin:0 4px"><span>總成本 <b>${fmt(cost)}</b></span><span>未實現損益 <b class="${pl>=0?"up":"down"}">${sgn(pl)}（${pct(cost?pl/cost*100:0)}）</b></span></div>`:""}
   <section class="sheet alt"><div class="between"><span class="label">市值走勢（每次更新股價記一點）</span></div>${spark(pts)}
-    <div class="label" style="margin-top:4px">網頁版抓不到即時股價，點一檔持股填入今天的收盤價就好。台股慣例：紅漲綠跌。</div></section>
+    <div class="label" style="margin-top:4px">${MODE==="app"?`台股每個交易日收盤後自動更新${S.pricesDate?`，目前是 ${esc(S.pricesDate.slice(5).replace("-","/"))} 收盤價`:""}。美股或抓不到的代號，點進去手動填價。`:"點一檔持股填入今天的收盤價。"}台股慣例：紅漲綠跌。</div></section>
   <div class="st"><h3>存款帳戶</h3><button type="button" class="link" data-act="editAcc">新增帳戶</button></div>
   <section class="sheet hold">${S.accounts.map(a=>`<button type="button" class="hr" data-act="editAcc" data-id="${a.id}"><span class="n row">${ic("piggy")} ${esc(a.name)}</span><span class="v num">${fmt(a.balance)}</span></button>`).join("")}</section>
   <div class="st"><h3>先留起來的錢</h3></div>

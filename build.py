@@ -2,7 +2,7 @@
   python3 build.py            → cat-ledger.html / dog-ledger.html（Claude artifact 版）
                                  docs/（獨立 App 版，放 GitHub Pages）
 """
-import json, os, shutil, subprocess, time
+import base64, json, os, shutil, subprocess, tempfile, time
 
 THEMES = {
     'dog': dict(name='小狗記帳本', short='小狗記帳', bg='#FFFDF6', url='https://claude.ai/artifact/7N8jkUKZbH6YRV6vfGD5tg', tokens='''  color-scheme: light;
@@ -16,9 +16,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 src = open(os.path.join(HERE, 'template.html'), encoding='utf-8').read()
 stamp = time.strftime('%Y%m%d%H%M%S')
 
+def mascot_uri(k):
+    tmp = os.path.join(tempfile.gettempdir(), f'mascot-{k}.jpg')
+    subprocess.run(['sips', '-s', 'format', 'jpeg', '-s', 'formatOptions', '82', '-z', '160', '160',
+                    os.path.join(HERE, f'icon-{k}.png'), '--out', tmp], check=True, capture_output=True)
+    return 'data:image/jpeg;base64,' + base64.b64encode(open(tmp, 'rb').read()).decode()
+
+MASCOTS = {k: mascot_uri(k) for k in THEMES}
+
 def fill(k, mode):
     t = THEMES[k]
-    return (src.replace('__NAME__', t['name']).replace('__TOKENS__', t['tokens'])
+    return (src.replace('__MASCOT__', MASCOTS[k]).replace('__NAME__', t['name']).replace('__TOKENS__', t['tokens'])
                .replace('__THEME__', k).replace('__URL__', t['url']).replace('__MODE__', mode))
 
 SW = '''const CACHE = "ledger-%(k)s-%(stamp)s";
@@ -31,6 +39,12 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
+  if (url.pathname.endsWith("/prices.json")) {
+    // 股價：先拿最新的，離線時用上次的
+    e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; })
+      .catch(() => caches.match(e.request)));
+    return;
+  }
   if (e.request.mode === "navigate" || (url.origin === location.origin && url.pathname.endsWith(".html"))) {
     // 頁面：先試網路拿新版，離線時用快取
     e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put("./index.html", c)); return r; })

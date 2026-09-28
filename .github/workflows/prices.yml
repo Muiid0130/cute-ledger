@@ -1,0 +1,29 @@
+name: 更新台股收盤價
+
+on:
+  schedule:
+    - cron: "30 7 * * 1-5"   # 台灣時間週一到週五 15:30（收盤後）
+    - cron: "30 9 * * 1-5"   # 17:30 再補抓一次，以防資料還沒出來
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/fetch_prices.py
+      - name: 有變動才提交
+        run: |
+          if [ -n "$(git status --porcelain docs/prices.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/prices.json
+            git commit -m "更新台股收盤價"
+            git push
+          fi
