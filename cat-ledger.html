@@ -300,6 +300,15 @@ const I = {
 const BAG_ICONS = ["food","bus","basket","boba","ticket","tv","tooth","home2","shirt","paw","book","plane","heart","gift","pill","car","yoga","signal","shield","invest","coin","piggy","phone","card"];
 const SWATCHES = ["#FF9DBB","#FFB3C7","#FFC9A8","#FFE08A","#B8E08A","#8FD6BC","#8ED8E0","#8EC3F0","#A9B8F5","#D6B8F2","#F7A8D0","#E8C4A0"];
 const FIXED_COLOR = "#C9B8E8";
+const DEFAULT_ITEMS = {
+  food:["早餐","午餐","晚餐","宵夜","點心","買菜"],
+  move:["捷運","公車","Uber","計程車","高鐵","加油","停車"],
+  daily:["衛生紙","清潔用品","保養品","藥妝","生活雜貨"],
+  cafe:["咖啡","手搖飲","茶","果汁"],
+  fun:["電影","聚餐","唱歌","遊戲","展覽"],
+  sub:["Netflix","Spotify","iCloud","YouTube"],
+};
+const splitItems = t => String(t||"").split(/[,，、\s]+/).map(x=>x.trim()).filter(Boolean).slice(0,12);
 function defaultFixed(){
   return [
     THEME==="cat" && {id:"yoga",icon:"yoga",name:"瑜伽課",amount:2400,day:5,pay:"acc:bank",color:"#D6B8F2",auto:true},
@@ -388,19 +397,19 @@ function sampleState(){
   return {
     v:2, sample:true,
     bags:[
-      {id:"food",icon:"food",name:"伙食",budget:8000,channel:"餐飲",color:"#FF9DBB"},
-      {id:"move",icon:"bus",name:"交通",budget:1500,channel:"交通",color:"#8EC3F0"},
-      {id:"daily",icon:"basket",name:"日用品",budget:2000,channel:"超商",color:"#B8E08A"},
-      {id:"cafe",icon:"boba",name:"飲料咖啡",budget:1500,channel:"餐飲",color:"#FFC9A8"},
-      {id:"fun",icon:"ticket",name:"娛樂社交",budget:3000,channel:"娛樂",color:"#D6B8F2"},
-      {id:"sub",icon:"tv",name:"固定訂閱",budget:1000,channel:"網購",color:"#8ED8E0"},
+      {id:"food",icon:"food",name:"伙食",budget:8000,channel:"餐飲",color:"#FF9DBB",items:DEFAULT_ITEMS.food},
+      {id:"move",icon:"bus",name:"交通",budget:1500,channel:"交通",color:"#8EC3F0",items:DEFAULT_ITEMS.move},
+      {id:"daily",icon:"basket",name:"日用品",budget:2000,channel:"超商",color:"#B8E08A",items:DEFAULT_ITEMS.daily},
+      {id:"cafe",icon:"boba",name:"飲料咖啡",budget:1500,channel:"餐飲",color:"#FFC9A8",items:DEFAULT_ITEMS.cafe},
+      {id:"fun",icon:"ticket",name:"娛樂社交",budget:3000,channel:"娛樂",color:"#D6B8F2",items:DEFAULT_ITEMS.fun},
+      {id:"sub",icon:"tv",name:"固定訂閱",budget:1000,channel:"網購",color:"#8ED8E0",items:DEFAULT_ITEMS.sub},
     ],
     accounts:[{id:"bank",name:"薪轉帳戶",balance:82400},{id:"cash",name:"錢包現金",balance:3150}],
     reserves:{save:20000,buffer:10000},
     cards:[
-      {id:"c1",name:"主力卡",last4:"8888",base:1,limit:80000,paidTs:0,style:0,rules:[{id:"r1",name:"日常加碼",channels:["餐飲","超商","交通"],pays:[],foreign:false,rate:5,cap:300}]},
-      {id:"c2",name:"網購卡",last4:"1234",base:0.5,limit:50000,paidTs:0,style:1,rules:[{id:"r2",name:"網購加碼",channels:["網購"],pays:[],foreign:false,rate:5.5,cap:200}]},
-      {id:"c3",name:"旅遊卡",last4:"5678",base:1,limit:60000,paidTs:0,style:2,rules:[{id:"r3",name:"海外加碼",channels:[],pays:[],foreign:true,rate:3,cap:500},{id:"r4",name:"行動支付",channels:[],pays:["Apple Pay","LINE Pay"],foreign:false,rate:2,cap:100}]},
+      {id:"c1",name:"主力卡",last4:"8888",limit:80000,closeDay:5,payDay:20,paidTs:0,color:"#FF9DBB"},
+      {id:"c2",name:"網購卡",last4:"1234",limit:50000,closeDay:15,payDay:3,paidTs:0,color:"#8EC3F0"},
+      {id:"c3",name:"旅遊卡",last4:"5678",limit:60000,closeDay:25,payDay:10,paidTs:0,color:"#D6B8F2"},
     ],
     stocks:[
       {id:uid(),sym:"0050",name:"元大台灣50",shares:200,cost:150,price:188.5,prev:186.2,ccy:"TWD"},
@@ -425,7 +434,7 @@ function blankState(){
 /* ---------------- state + persistence ---------------- */
 let S = sampleState();
 const UI = { tab:"home", month:MONTH, year:NOW.getFullYear(), showFall:false, bagFilter:null,
-  finder:{amt:"1200",merchant:"",channel:"網購",wallet:"實體卡",foreign:false} };
+ };
 try{ const t=localStorage.getItem("ledger-tab-"+THEME); if(t) UI.tab=t; }catch(e){}
 
 const LSK = "ledger-v2-"+THEME;
@@ -453,7 +462,7 @@ function persist(){
     }).catch(()=>{ syncNote="雲端同步失敗，先存在這台裝置，下次操作會再試"; paintSync(); });
   },600);
 }
-function migrate(s){ if(!s||s.v!==2) return null; s.fixed ||= defaultFixed(); s.bags.forEach((b,i)=>{ b.color ||= SWATCHES[(i*3)%SWATCHES.length]; }); delete s.inbox; delete s.seen; s.portLog ||= {}; s.savingsLog ||= {}; return s; }
+function migrate(s){ if(!s||s.v!==2) return null; s.fixed ||= defaultFixed(); s.bags.forEach((b,i)=>{ b.color ||= SWATCHES[(i*3)%SWATCHES.length]; if(!Array.isArray(b.items)) b.items = DEFAULT_ITEMS[b.id] ? [...DEFAULT_ITEMS[b.id]] : []; }); s.cards.forEach((c,i)=>{ c.closeDay ||= 5; c.payDay ||= 20; c.limit ||= 0; c.color ||= SWATCHES[(i*4+7)%SWATCHES.length]; delete c.rules; delete c.base; delete c.style; }); delete s.inbox; delete s.seen; s.portLog ||= {}; s.savingsLog ||= {}; return s; }
 async function boot(){
   try{ const c=migrate(JSON.parse(localStorage.getItem(LSK)||"null")); if(c) S=c; }catch(e){}
   render();
@@ -518,39 +527,20 @@ function waterfall(){
 const payLabel = p => { if(!p) return "現金"; const [k,id]=p.split(":"); if(k==="card"){ const c=cardById(id); return c?c.name:"已刪除的卡"; } const a=S.accounts.find(a=>a.id===id); return a?a.name:"帳戶"; };
 const txChannel = t => t.channel || channelOfMerchant(t.merchant) || bagOf(t.bag).channel || "一般";
 
-/* ---------------- card rewards ---------------- */
-function ruleMatch(r,ch,w,f){
-  let cond=false;
-  if(r.channels?.length){ if(!r.channels.includes(ch)) return false; cond=true; }
-  if(r.pays?.length){ if(!r.pays.includes(w)) return false; cond=true; }
-  if(r.foreign){ if(!f) return false; cond=true; }
-  return cond;
-}
-function bestReward(card,amt,ch,w,f,used){
-  let best={value:amt*card.base/100, rate:card.base, rule:null, left:null};
-  for(const r of card.rules){
-    if(!ruleMatch(r,ch,w,f)) continue;
-    const left = r.cap>0 ? Math.max(0,r.cap-(used[r.id]||0)) : Infinity;
-    const raw = amt*r.rate/100, bonus=Math.min(raw,left);
-    const rest = raw>left ? (amt-left*100/r.rate)*card.base/100 : 0;
-    const val = bonus+rest;
-    if(val>best.value+1e-9) best={value:val, rate:amt?val/amt*100:r.rate, rule:r, left, bonus};
-  }
-  return best;
-}
-function cardMonth(card,ym){
-  const txs = S.txns.filter(t=>t.pay==="card:"+card.id && t.date.startsWith(ym)).sort((a,b)=>a.ts-b.ts);
-  const used={}, per={}; let total=0, spend=0;
-  for(const t of txs){ spend+=t.amt; const r=bestReward(card,t.amt,txChannel(t),t.wallet,t.foreign,used); per[t.id]=r; total+=r.value; if(r.rule) used[r.rule.id]=(used[r.rule.id]||0)+(r.bonus||0); }
-  return {total,spend,used,per,count:txs.length};
-}
-function rankCards(amt,ch,w,f){
-  return S.cards.map(c=>{ const m=cardMonth(c,MONTH); const r=bestReward(c,amt,ch,w,f,m.used); return {c,r}; }).sort((a,b)=>b.r.value-a.r.value);
-}
-function explain(c,r,amt){
-  if(!r.rule) return `沒有符合的加碼，用基本回饋 ${c.base}%：${fmt(amt)} × ${c.base}% ≈ ${fmt2(r.value)}`;
-  const capTxt = r.rule.cap>0 ? `本月加碼上限 ${fmt(r.rule.cap)}，還剩 ${fmt(r.left)}` : "沒有上限";
-  return `符合「${r.rule.name}」${r.rule.rate}%（${capTxt}）：${fmt(amt)} × ${r.rule.rate}% ≈ ${fmt2(amt*r.rule.rate/100)}${r.value<amt*r.rule.rate/100-0.01?"，超過上限的部分改算基本回饋":""}`;
+/* ---------------- card billing cycle ---------------- */
+const dayIn = (y,m,d) => new Date(y, m, Math.min(d, new Date(y, m+1, 0).getDate()));
+const ds = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const md = d => `${d.getMonth()+1}/${d.getDate()}`;
+function cardCycle(c, ref=new Date()){
+  let end = dayIn(ref.getFullYear(), ref.getMonth(), c.closeDay);
+  if(ref.getDate() > end.getDate()) end = dayIn(ref.getFullYear(), ref.getMonth()+1, c.closeDay);
+  const prevEnd = dayIn(end.getFullYear(), end.getMonth()-1, c.closeDay);
+  const prevPrevEnd = dayIn(end.getFullYear(), end.getMonth()-2, c.closeDay);
+  const plus1 = d => { const x=new Date(d); x.setDate(x.getDate()+1); return x; };
+  const payOf = e => dayIn(e.getFullYear(), e.getMonth() + (c.payDay>c.closeDay?0:1), c.payDay);
+  const sum = (a,b) => S.txns.filter(t=>t.pay==="card:"+c.id && t.date>=ds(a) && t.date<=ds(b)).reduce((s,t)=>s+t.amt,0);
+  const curStart = plus1(prevEnd), prevStart = plus1(prevPrevEnd);
+  return { curStart, curEnd:end, curSpend:sum(curStart,end), prevStart, prevEnd, prevBill:sum(prevStart,prevEnd), payDate:payOf(prevEnd), nextPay:payOf(end) };
 }
 
 /* ---------------- charts ---------------- */
@@ -680,15 +670,14 @@ function txRows(list,grouped=false){
   for(const t of list){
     const b=bagOf(t.bag);
     if(grouped && t.date!==lastDay){ lastDay=t.date; const d=new Date(t.date+"T12:00"); out+=`<div class="day">${+t.date.slice(5,7)}/${+t.date.slice(8)}（${"日一二三四五六"[d.getDay()]}）</div>`; }
-    const rw = t.pay?.startsWith("card:") ? cardRewardOf(t) : 0;
     out += `<div class="txn"><span class="tile" style="background:${bagColor(t.bag)}">${ic(b.icon)}</span>
       <div style="min-width:0"><div class="t1">${esc(t.merchant||b.name)}</div><div class="t2">${grouped?"":t.date.slice(5).replace("-","/")+" · "}${esc(b.name)} · ${esc(payLabel(t.pay))}${t.src==="auto"?" · 自動":""}</div></div>
-      <span class="amt num">−${fmt(t.amt)}${rw?`<small>回饋 ${fmt2(rw)}</small>`:""}</span>
+      <span class="amt num">−${fmt(t.amt)}</span>
       <button type="button" class="del" data-act="delTx" data-id="${t.id}" aria-label="刪除這筆">${ic("trash")}</button></div>`;
   }
   return out;
 }
-function cardRewardOf(t){ const c=cardById(t.pay.slice(5)); if(!c) return 0; return cardMonth(c,t.date.slice(0,7)).per[t.id]?.value||0; }
+
 
 function pageDetail(){
   const ym=UI.month, sp=spentBy(ym), used=Object.values(sp).reduce((a,b)=>a+b,0);
@@ -714,32 +703,27 @@ function pageDetail(){
 }
 
 function pageCards(){
-  const F=UI.finder, amt=n0(F.amt), ranked = amt>0 ? rankCards(amt,F.channel,F.wallet,F.foreign) : [];
-  const totalRw = S.cards.reduce((s,c)=>s+cardMonth(c,MONTH).total,0);
+  const totalDue = allCardDue(), totalLimit = S.cards.reduce((s,c)=>s+(c.limit||0),0);
+  const today = new Date(); today.setHours(0,0,0,0);
   return `
-  <div class="pagehead"><h2>卡片</h2><span class="chipbtn">本月回饋 <b class="num">${fmt2(totalRw)}</b></span></div>
+  <div class="pagehead"><h2>我的卡</h2><button type="button" class="link" data-act="editCard">新增一張</button></div>
   ${sampleBar()}
-  <div class="st"><h3>刷哪張卡，回饋最多？</h3></div>
-  <section class="sheet finder">
-    <div class="grid2"><label class="field">金額<input class="inp big" id="fAmt" inputmode="decimal" value="${esc(F.amt)}" data-f="amt"></label>
-      <label class="field">商家（選填）<input class="inp" id="fMer" list="merList" value="${esc(F.merchant)}" data-f="merchant" placeholder="例如：蝦皮"></label></div>
-    <datalist id="merList">${MLIST.map(x=>`<option value="${esc(x.n)}">`).join("")}</datalist>
-    <div class="field">通路<div class="chips">${CHANNELS.map(c=>`<button type="button" class="chip" data-act="fset" data-k="channel" data-v="${c}" aria-pressed="${F.channel===c}">${c}</button>`).join("")}</div></div>
-    <div class="field">怎麼付<div class="chips">${WALLETS.map(w=>`<button type="button" class="chip" data-act="fset" data-k="wallet" data-v="${w}" aria-pressed="${F.wallet===w}">${w}</button>`).join("")}
-      <button type="button" class="chip" data-act="fset" data-k="foreign" data-v="0" aria-pressed="${!F.foreign}">國內</button><button type="button" class="chip" data-act="fset" data-k="foreign" data-v="1" aria-pressed="${F.foreign}">國外</button></div></div>
-    <div class="rank">${ranked.length?ranked.map((x,i)=>`<div class="rk ${i===0?"first":""}">
-      <div class="row" style="flex-wrap:wrap"><span class="no">${i+1}</span><b>${esc(x.c.name)}</b><span class="tag">••${esc(x.c.last4)}</span>${x.r.rule?`<span class="tag ok">${esc(x.r.rule.name)}</span>`:""}</div>
-      <div class="row"><span class="rate num">${fmt2(x.r.rate)}%</span><span class="muted">這筆估計回饋約 NT$ <b class="num">${fmt2(x.r.value)}</b></span></div>
-      <details><summary>怎麼算的</summary>${esc(explain(x.c,x.r,amt))}</details>${i===0?`<button type="button" class="btn sm" style="align-self:flex-start" data-act="useCard" data-card="${x.c.id}">${ic("check")} 用這張記</button>`:""}</div>`).join(""):`<div class="empty">輸入金額就會幫你排名</div>`}</div>
-  </section>
-  <div class="st"><h3>我的卡</h3><button type="button" class="link" data-act="editCard">新增一張</button></div>
-  ${S.cards.map((c,i)=>{ const m=cardMonth(c,MONTH), due=cardDue(c);
+  ${S.cards.length?`<div class="tiles">
+    <div class="sheet"><div class="label">卡費待繳（全部）</div><div class="v num">${fmt(totalDue)}</div></div>
+    <div class="sheet alt" style="background:var(--a1-soft)"><div class="label">總可用餘額</div><div class="v num">${fmt(totalLimit-totalDue)}</div></div>
+  </div>`:`<div class="empty">還沒有卡片，按右上角「新增一張」</div>`}
+  ${S.cards.map((c,i)=>{ const due=cardDue(c), cy=cardCycle(c), avail=(c.limit||0)-due, usedP=c.limit?Math.min(100,due/c.limit*100):0;
+    const days = Math.round((cy.payDate-today)/864e5);
     return `<section class="sheet cc ${i%2?"alt":""}">
-      <div class="face" style="background-color:${color(c.style??i)}"><div class="between"><b>${esc(c.name)}</b><button type="button" class="x" data-act="editCard" data-card="${c.id}" aria-label="編輯${esc(c.name)}">${ic("pencil")}</button></div>
-        <div class="between"><span class="num">•••• ${esc(c.last4)}</span><span class="label" style="color:var(--ink)">基本 ${c.base}%</span></div></div>
-      <div class="grid3"><div><div class="label">本月刷</div><b class="num" style="font-size:20px">${fmt(m.spend)}</b></div><div><div class="label">本月回饋</div><b class="num" style="font-size:20px;color:var(--down)">${fmt2(m.total)}</b></div><div><div class="label">卡費待繳</div><b class="num" style="font-size:20px">${fmt(due)}</b></div></div>
-      ${c.rules.map(r=>{ const usedR=m.used[r.id]||0, left=r.cap>0?Math.max(0,r.cap-usedR):null; return `<div class="pr"><div class="between" style="font-size:14px"><span>${esc(r.name)} ${r.rate}%</span><span class="muted">${left==null?"沒有上限":left>0?`還可刷 <b class="num" style="color:var(--ink)">${fmt(left*100/r.rate)}</b>`:"加碼用完了"}</span></div>${r.cap>0?`<div class="bar thin"><i style="width:${Math.min(100,usedR/r.cap*100)}%;background-color:var(--a2)"></i></div>`:""}</div>`; }).join("")}
-      ${due?`<div class="between"><span class="label">繳清後會從「${esc(S.accounts[0]?.name||"帳戶")}」扣掉</span><button type="button" class="btn sm soft" data-act="payCard" data-card="${c.id}">繳清 ${fmt(due)}</button></div>`:""}
+      <div class="face" style="background-color:${c.color}"><div class="between"><b>${esc(c.name)}</b><button type="button" class="x" data-act="editCard" data-card="${c.id}" aria-label="編輯${esc(c.name)}">${ic("pencil")}</button></div>
+        <div class="between"><span class="num">•••• ${esc(c.last4)}</span><span class="label" style="color:var(--ink)">每月 ${c.closeDay} 號結帳・${c.payDay} 號繳款</span></div></div>
+      <div class="grid3">
+        <div><div class="label">本期消費</div><b class="num" style="font-size:20px">${fmt(cy.curSpend)}</b><div class="label num">${md(cy.curStart)}–${md(cy.curEnd)}</div></div>
+        <div><div class="label">上期帳單</div><b class="num" style="font-size:20px">${fmt(cy.prevBill)}</b><div class="label">${days>=0?`${md(cy.payDate)} 繳（${days===0?"今天":days+" 天後"}）`:`已過繳款日，下次 ${md(cy.nextPay)}`}</div></div>
+        <div><div class="label">可用餘額</div><b class="num" style="font-size:20px;color:${avail<0?"var(--danger)":"var(--ink)"}">${fmt(avail)}</b><div class="label">額度 ${fmt(c.limit)}</div></div>
+      </div>
+      ${c.limit?`<div class="bar thin"><i style="width:${usedP}%;background-color:${usedP>80?"var(--danger)":c.color}"></i></div>`:""}
+      ${due?`<div class="between"><span class="label">未繳 ${fmt(due)}，繳清後從「${esc(S.accounts[0]?.name||"帳戶")}」扣掉</span><button type="button" class="btn sm soft" data-act="payCard" data-card="${c.id}">繳清</button></div>`:`<div class="label">目前沒有未繳的卡費</div>`}
     </section>`; }).join("")}`;
 }
 
@@ -878,10 +862,8 @@ function openEntry(pre={}){
     <div class="chips scroll" id="eBags">${S.bags.map((b,i)=>`<button type="button" class="chip" data-pick="${b.id}"><span style="color:var(--ink)">${ic(b.icon)}</span>${esc(b.name)}</button>`).join("")}</div>
     <div class="display"><div class="after" id="eAfter"></div><div class="amt num" id="eAmt">0</div></div>
     <div class="chips scroll">${pays.map(([k,l])=>`<button type="button" class="chip" data-pay="${k}">${k.startsWith("card")?ic("card"):ic("wallet")}${esc(l)}</button>`).join("")}</div>
-    <div class="chips scroll" id="eWallet"></div>
-    <div id="eHint"></div>
     <div class="chips scroll" id="eMer"></div>
-    <input class="inp" id="eNote" maxlength="30" placeholder="商家或備註（選填）" value="${esc(E.merchant)}">
+    <input class="inp" id="eNote" maxlength="30" placeholder="細項或備註（選填）" value="${esc(E.merchant)}">
     <div class="keys">${["7","8","9","⌫","4","5","6","GO","1","2","3",".","0","00"].map(k=>k==="GO"?`<button type="button" class="key go" id="eGo" disabled>${ic("check")}記下</button>`:k==="⌫"?`<button type="button" class="key" data-k="⌫" aria-label="刪一個字">${ic("back")}</button>`:`<button type="button" class="key" data-k="${k}">${k}</button>`).join("")}</div>`, d=>{
     const $=s=>d.querySelector(s);
     const upd=()=>{
@@ -892,24 +874,14 @@ function openEntry(pre={}){
       $("#eAmt").textContent = E.amt||"0";
       $("#eAfter").innerHTML = `剩 <span class="num">${fmt(left)}</span> → <span class="num" style="color:${left-v<0?"var(--danger)":"var(--ink)"}">${fmt(left-v)}</span>`;
       $("#eGo").disabled = !(v>0);
-      const isCard = E.pay.startsWith("card:");
-      $("#eWallet").innerHTML = isCard ? WALLETS.map(w=>`<button type="button" class="chip" data-wallet="${w}" aria-pressed="${E.wallet===w}">${w}</button>`).join("")+`<button type="button" class="chip" data-foreign aria-pressed="${E.foreign}">國外消費</button>` : "";
-      $("#eWallet").hidden = !isCard;
-      const ch = channelOfMerchant($("#eNote").value) || b.channel || "一般";
-      const best = v>0 && S.cards.length ? rankCards(v,ch,E.wallet,E.foreign)[0] : null;
-      $("#eHint").innerHTML = best && best.r.value>0 && E.pay!=="card:"+best.c.id
-        ? `<div class="hintline"><span>${ic("spark")} 這筆刷「${esc(best.c.name)}」約回饋 NT$${fmt2(best.r.value)}（${fmt2(best.r.rate)}%）</span><button type="button" class="btn sm soft" data-apply="card:${best.c.id}">套用</button></div>` : "";
-      const recent=[...new Set(S.txns.filter(t=>t.bag===E.bag&&t.merchant).sort((a,b)=>b.ts-a.ts).map(t=>t.merchant))].slice(0,6);
-      const fallback = (MERCHANTS[b.channel]||[]).slice(0,4);
-      $("#eMer").innerHTML = [...new Set([...recent,...fallback])].slice(0,7).map(m=>`<button type="button" class="chip" data-mer="${esc(m)}" aria-pressed="${$("#eNote").value===m}">${esc(m)}</button>`).join("");
+      const items = b.items || [];
+      const recent = [...new Set(S.txns.filter(t=>t.bag===E.bag&&t.merchant&&!items.includes(t.merchant)).sort((a,b)=>b.ts-a.ts).map(t=>t.merchant))].slice(0,3);
+      $("#eMer").innerHTML = [...items,...recent].map(m=>`<button type="button" class="chip" data-mer="${esc(m)}" aria-pressed="${$("#eNote").value===m}">${esc(m)}</button>`).join("");
     };
     d.addEventListener("click",e=>{
       const t=e.target.closest("button"); if(!t) return;
       if(t.dataset.pick) E.bag=t.dataset.pick;
       else if(t.dataset.pay) E.pay=t.dataset.pay;
-      else if(t.dataset.apply) E.pay=t.dataset.apply;
-      else if(t.dataset.wallet) E.wallet=t.dataset.wallet;
-      else if("foreign" in t.dataset) E.foreign=!E.foreign;
       else if(t.dataset.mer) $("#eNote").value=t.dataset.mer;
       else if(t.dataset.k){ const k=t.dataset.k;
         if(k==="⌫") E.amt=E.amt.slice(0,-1);
@@ -920,7 +892,7 @@ function openEntry(pre={}){
         const v=n0(E.amt); if(!(v>0)) return;
         const note=$("#eNote").value.trim();
         closeDrawer();
-        recordTx({id:uid(),bag:E.bag,amt:v,merchant:note,pay:E.pay,wallet:E.pay.startsWith("card:")?E.wallet:"",foreign:E.foreign,channel:null,date:pre.date||todayStr(),ts:Date.now(),src:pre.src||"manual"});
+        recordTx({id:uid(),bag:E.bag,amt:v,merchant:note,pay:E.pay,wallet:"",foreign:false,channel:null,date:pre.date||todayStr(),ts:Date.now(),src:pre.src||"manual"});
         if(pre.onDone) pre.onDone();
         return;
       } else return;
@@ -942,14 +914,14 @@ function openBags(){
         <input class="inp num" style="width:92px;font-size:20px" value="${b.budget}" inputmode="numeric" data-f="budget" aria-label="每月預算">
         <button type="button" class="x" data-rm="${i}" aria-label="刪除袋子">${ic("trash")}</button></div>
       ${sel===i?`<div class="label">顏色</div>${swatches(b.color)}<div class="label">圖示</div><div class="iconpick">${BAG_ICONS.map(n=>`<button type="button" data-icon="${n}" aria-pressed="${b.icon===n}" aria-label="${n}">${ic(n)}</button>`).join("")}</div>
-      <div class="label">通路（刷卡回饋會用到）</div><div class="chips">${CHANNELS.map(c=>`<button type="button" class="chip" data-ch="${c}" aria-pressed="${b.channel===c}">${c}</button>`).join("")}</div>`:""}
+      <label class="field">記帳時的快速細項（用逗號或空白分開）<input class="inp" data-f="items" value="${esc((b.items||[]).join("、"))}" placeholder="例如：早餐、午餐、晚餐"></label>`:""}
     </div>`).join("");
   };
-  openDrawer(`${head("調整預算袋")}<div class="label">每袋一個月想花多少？點左邊的圓圈可以換顏色、圖示和通路。</div>
+  openDrawer(`${head("調整預算袋")}<div class="label">每袋一個月想花多少？點左邊的圓圈可以換顏色、圖示和記帳時的快速細項。</div>
     <div id="bRows" style="display:flex;flex-direction:column;gap:8px"></div>
     <button type="button" class="btn ghost" id="bAdd">${ic("plus")} 加一個袋子</button><button type="button" class="btn" id="bSave">存好</button>`, d=>{
     paint(d);
-    d.addEventListener("input",e=>{ const r=e.target.closest("[data-i]"); if(!r) return; const b=draft[+r.dataset.i]; const f=e.target.dataset.f; if(f==="budget") b.budget=parseInt(e.target.value.replace(/\D/g,""))||0; else if(f) b.name=e.target.value; });
+    d.addEventListener("input",e=>{ const r=e.target.closest("[data-i]"); if(!r) return; const b=draft[+r.dataset.i]; const f=e.target.dataset.f; if(f==="budget") b.budget=parseInt(e.target.value.replace(/\D/g,""))||0; else if(f==="items") b.items=splitItems(e.target.value); else if(f) b.name=e.target.value; });
     d.addEventListener("click",e=>{
       const b=e.target.closest("button"); if(!b) return; const r=b.closest("[data-i]"); const i=r?+r.dataset.i:-1;
       if(b.dataset.sel!=null){ sel = sel===+b.dataset.sel?-1:+b.dataset.sel; paint(d); }
@@ -957,7 +929,7 @@ function openBags(){
       else if(b.dataset.ch){ draft[i].channel=b.dataset.ch; paint(d); }
       else if(b.dataset.color){ draft[i].color=b.dataset.color; paint(d); }
       else if(b.dataset.rm!=null){ draft.splice(+b.dataset.rm,1); sel=-1; paint(d); }
-      else if(b.id==="bAdd"){ draft.push({id:uid(),icon:"gift",name:"新袋子",budget:1000,channel:"一般",color:SWATCHES[(draft.length*5)%SWATCHES.length]}); sel=draft.length-1; paint(d); }
+      else if(b.id==="bAdd"){ draft.push({id:uid(),icon:"gift",name:"新袋子",budget:1000,channel:"一般",items:[],color:SWATCHES[(draft.length*5)%SWATCHES.length]}); sel=draft.length-1; paint(d); }
       else if(b.id==="bSave"){ S.bags=draft.filter(b=>b.name.trim()).map(b=>({...b,name:b.name.trim()})); persist(); closeDrawer(); render(); toast("預算袋更新好了"); }
     });
   });
@@ -997,34 +969,22 @@ function openFixed(){
   });
 }
 function openCardEdit(id){
-  const src = id ? cardById(id) : {id:uid(),name:"",last4:"",base:1,limit:0,paidTs:Date.now(),style:S.cards.length,rules:[]};
+  const src = id ? cardById(id) : {id:uid(),name:"",last4:"",limit:0,closeDay:5,payDay:20,paidTs:Date.now(),color:SWATCHES[(S.cards.length*4+7)%SWATCHES.length]};
   const c = JSON.parse(JSON.stringify(src));
-  const paint = d => { d.querySelector("#rRows").innerHTML = c.rules.map((r,i)=>`<div class="erow" data-r="${i}">
-      <div class="row"><input class="inp grow" value="${esc(r.name)}" data-rf="name" placeholder="加碼名稱" aria-label="加碼名稱"><button type="button" class="x" data-rrm="${i}" aria-label="刪除這條加碼">${ic("trash")}</button></div>
-      <div class="grid2"><label class="field">回饋 %<input class="inp num" inputmode="decimal" value="${r.rate}" data-rf="rate"></label><label class="field">每月回饋上限（0 = 沒上限）<input class="inp num" inputmode="numeric" value="${r.cap}" data-rf="cap"></label></div>
-      <div class="field">適用通路<div class="chips">${CHANNELS.map(ch=>`<button type="button" class="chip" data-rch="${ch}" aria-pressed="${r.channels.includes(ch)}">${ch}</button>`).join("")}</div></div>
-      <div class="field">限定付款方式<div class="chips">${WALLETS.map(w=>`<button type="button" class="chip" data-rw="${w}" aria-pressed="${r.pays.includes(w)}">${w}</button>`).join("")}<button type="button" class="chip" data-rfo aria-pressed="${!!r.foreign}">限國外</button></div></div>
-    </div>`).join(""); };
   openDrawer(`${head(id?"編輯卡片":"新增卡片")}
     <div class="grid2"><label class="field">卡片名稱<input class="inp" id="cName" value="${esc(c.name)}" placeholder="例如：國泰 CUBE"></label><label class="field">末四碼<input class="inp num" id="cLast" maxlength="4" inputmode="numeric" value="${esc(c.last4)}"></label></div>
-    <label class="field">基本回饋 %<input class="inp num" id="cBase" inputmode="decimal" value="${c.base}"></label>
-    <div class="label">加碼規則：符合條件時用加碼 %，超過上限改用基本回饋。各銀行活動常變，請依你的卡片權益填寫。</div>
-    <div id="rRows" style="display:flex;flex-direction:column;gap:8px"></div>
-    <button type="button" class="btn ghost" id="rAdd">${ic("plus")} 加一條加碼</button>
+    <label class="field">信用額度<input class="inp num" id="cLimit" inputmode="numeric" value="${c.limit||""}" placeholder="例如 80000"></label>
+    <div class="grid2"><label class="field">每月幾號結帳<input class="inp num" id="cClose" inputmode="numeric" value="${c.closeDay}"></label><label class="field">每月幾號繳款<input class="inp num" id="cPay" inputmode="numeric" value="${c.payDay}"></label></div>
+    <div class="label">卡片顏色</div><div id="cColors">${swatches(c.color)}</div>
     <div class="grid2">${id?`<button type="button" class="btn warn" id="cDel">${ic("trash")} 刪除卡片</button>`:"<span></span>"}<button type="button" class="btn" id="cSave">存好</button></div>`, d=>{
-    paint(d);
-    d.addEventListener("input",e=>{ const r=e.target.closest("[data-r]"); if(!r) return; const R=c.rules[+r.dataset.r], f=e.target.dataset.rf; if(f==="name") R.name=e.target.value; else if(f) R[f]=n0(e.target.value); });
     d.addEventListener("click",e=>{
-      const b=e.target.closest("button"); if(!b) return; const r=b.closest("[data-r]"); const R=r?c.rules[+r.dataset.r]:null;
-      const tog=(arr,v)=>arr.includes(v)?arr.filter(x=>x!==v):[...arr,v];
-      if(b.dataset.rch){ R.channels=tog(R.channels,b.dataset.rch); paint(d); }
-      else if(b.dataset.rw){ R.pays=tog(R.pays,b.dataset.rw); paint(d); }
-      else if("rfo" in b.dataset){ R.foreign=!R.foreign; paint(d); }
-      else if(b.dataset.rrm!=null){ c.rules.splice(+b.dataset.rrm,1); paint(d); }
-      else if(b.id==="rAdd"){ c.rules.push({id:uid(),name:"新加碼",channels:[],pays:[],foreign:false,rate:3,cap:0}); paint(d); }
+      const b=e.target.closest("button"); if(!b) return;
+      const day = v => Math.min(31, Math.max(1, parseInt(v)||1));
+      if(b.dataset.color){ c.color=b.dataset.color; d.querySelector("#cColors").innerHTML=swatches(c.color); }
       else if(b.id==="cDel"){ S.cards=S.cards.filter(x=>x.id!==c.id); persist(); closeDrawer(); render(); toast("卡片刪掉了，之前的紀錄會保留"); }
       else if(b.id==="cSave"){
-        c.name=d.querySelector("#cName").value.trim(); c.last4=d.querySelector("#cLast").value.replace(/\D/g,"").slice(0,4); c.base=n0(d.querySelector("#cBase").value);
+        c.name=d.querySelector("#cName").value.trim(); c.last4=d.querySelector("#cLast").value.replace(/\D/g,"").slice(0,4);
+        c.limit=n0(d.querySelector("#cLimit").value); c.closeDay=day(d.querySelector("#cClose").value); c.payDay=day(d.querySelector("#cPay").value);
         if(!c.name){ toast("幫這張卡取個名字"); return; }
         const i=S.cards.findIndex(x=>x.id===c.id); if(i>=0) S.cards[i]=c; else S.cards.push(c);
         persist(); closeDrawer(); render(); toast("卡片存好了");
@@ -1094,8 +1054,6 @@ document.addEventListener("click",e=>{
     case "delTx": { const t=S.txns.find(x=>x.id===b.dataset.id); if(!t) break; removeTx(t.id); toast("刪掉了", ()=>recordTxSilent(t)); break; }
     case "month": UI.month=addMonths(UI.month,+b.dataset.d); if(UI.month>MONTH) UI.month=MONTH; render(); break;
     case "filter": UI.bagFilter=b.dataset.bag||null; render(); break;
-    case "fset": { const k=b.dataset.k; UI.finder[k]= k==="foreign" ? b.dataset.v==="1" : b.dataset.v; render(); break; }
-    case "useCard": { const F=UI.finder; const ch=F.channel; const bag=(S.bags.find(x=>x.channel===ch)||S.bags[0])?.id; openEntry({bag,amt:n0(F.amt),pay:"card:"+b.dataset.card,wallet:F.wallet,foreign:F.foreign,merchant:F.merchant}); break; }
     case "editCard": openCardEdit(b.dataset.card); break;
     case "payCard": { const c=cardById(b.dataset.card), due=cardDue(c), acc=S.accounts[0]; if(acc) acc.balance-=due; const old=c.paidTs; c.paidTs=Date.now(); persist(); render(); toast(`${c.name} 卡費 ${fmt(due)} 繳清了`, ()=>{ c.paidTs=old; if(acc) acc.balance+=due; persist(); render(); }); break; }
     case "editStock": openStock(b.dataset.id); break;
@@ -1112,12 +1070,6 @@ document.addEventListener("click",e=>{
   }
 });
 document.addEventListener("change",e=>{ if(e.target.id==="importFile" && e.target.files[0]){ importBackup(e.target.files[0]); e.target.value=""; return; } if(e.target.id==="incStk"){ S.goals.includeStocks=e.target.checked; persist(); render(); } });
-document.addEventListener("input",e=>{
-  const f=e.target.dataset?.f; if(!f || e.target.closest("#layer")) return;
-  UI.finder[f]=e.target.value;
-  if(f==="merchant"){ const ch=channelOfMerchant(e.target.value); if(ch) UI.finder.channel=ch; }
-  clearTimeout(document.t); document.t=setTimeout(()=>{ const id=e.target.id, pos=e.target.selectionStart; render(); const el=document.getElementById(id); if(el){ el.focus(); try{ el.setSelectionRange(pos,pos); }catch(_){} } },350);
-});
 function recordTxSilent(t){ S.txns.push(t); if(t.pay?.startsWith("acc:")){ const a=S.accounts.find(a=>a.id===t.pay.slice(4)); if(a) a.balance-=t.amt; } persist(); render(); }
 
 boot();
