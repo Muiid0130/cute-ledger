@@ -428,16 +428,12 @@ function sampleState(){
     goals:{targets:{[y-1]:45000,[y]:60000}, includeStocks:false,
       items:[{id:uid(),icon:"plane",name:"日本旅行",target:40000,saved:12000},{id:uid(),icon:"tooth",name:"牙齒矯正",target:30000,saved:5400}]},
     savingsLog:log, fixed:defaultFixed(),
-    inbox:[
-      {id:uid(),raw:"金額=NT$245|商家=Uber|卡=主力卡|末四碼=8888|來源=iPhone 捷徑|付款=Apple Pay",at:Date.now()},
-      {id:uid(),raw:"您的信用卡末四碼1234於09/27消費新臺幣1,190元，特店：蝦皮購物。",at:Date.now()},
-    ],
-    seen:[], txns,
+    txns,
   };
 }
 function blankState(){
   const s=sampleState(), y=NOW.getFullYear();
-  return {...s, sample:false, txns:[], inbox:[], stocks:[], portLog:{}, savingsLog:{},
+  return {...s, sample:false, txns:[], stocks:[], portLog:{}, savingsLog:{},
     accounts:[{id:"bank",name:"薪轉帳戶",balance:0},{id:"cash",name:"錢包現金",balance:0}],
     reserves:{save:0,buffer:0}, goals:{targets:{[y]:0},includeStocks:false,items:[]},
     cards:s.cards.map(c=>({...c,paidTs:Date.now()}))};
@@ -474,7 +470,7 @@ function persist(){
     }).catch(()=>{ syncNote="雲端同步失敗，先存在這台裝置，下次操作會再試"; paintSync(); });
   },600);
 }
-function migrate(s){ if(!s||s.v!==2) return null; s.fixed ||= defaultFixed(); s.bags.forEach((b,i)=>{ b.color ||= SWATCHES[(i*3)%SWATCHES.length]; }); s.inbox ||= []; s.seen ||= []; s.portLog ||= {}; s.savingsLog ||= {}; return s; }
+function migrate(s){ if(!s||s.v!==2) return null; s.fixed ||= defaultFixed(); s.bags.forEach((b,i)=>{ b.color ||= SWATCHES[(i*3)%SWATCHES.length]; }); delete s.inbox; delete s.seen; s.portLog ||= {}; s.savingsLog ||= {}; return s; }
 async function boot(){
   try{ const c=migrate(JSON.parse(localStorage.getItem(LSK)||"null")); if(c) S=c; }catch(e){}
   render();
@@ -496,7 +492,7 @@ async function boot(){
     } else { persist(); }
     syncNote = "已同步到你的帳號，換裝置也看得到，只有你看得到";
   }catch(e){ if(remote===null && MODE!=="app") syncNote="目前存在這台裝置的瀏覽器裡"; }
-  takeHash(); autoFixed(); render();
+  autoFixed(); render();
 }
 
 /* ---------------- derived numbers ---------------- */
@@ -573,59 +569,6 @@ function explain(c,r,amt){
   const capTxt = r.rule.cap>0 ? `本月加碼上限 ${fmt(r.rule.cap)}，還剩 ${fmt(r.left)}` : "沒有上限";
   return `符合「${r.rule.name}」${r.rule.rate}%（${capTxt}）：${fmt(amt)} × ${r.rule.rate}% ≈ ${fmt2(amt*r.rule.rate/100)}${r.value<amt*r.rule.rate/100-0.01?"，超過上限的部分改算基本回饋":""}`;
 }
-
-/* ---------------- auto-record parsing ---------------- */
-function parseText(raw){
-  const t = String(raw).replace(/\s+/g," ").trim();
-  const kv = {};
-  t.split(/[|｜;；\n]/).forEach(p=>{ const m=p.match(/^\s*([^=:：]{1,6})\s*[=:：]\s*(.+)$/); if(m) kv[m[1].trim()]=m[2].trim(); });
-  let amt = n0(kv["金額"]||kv["amount"]);
-  if(!amt){ const m = t.match(/(?:NT\$|NTD|TWD|新臺幣|新台幣|台幣|\$)\s*([\d,]+(?:\.\d+)?)/i) || t.match(/([\d,]+(?:\.\d+)?)\s*元/) || t.match(/金額[^\d]{0,6}([\d,]+(?:\.\d+)?)/); amt = m ? n0(m[1]) : 0; }
-  let merchant = kv["商家"]||kv["merchant"]||kv["特店"]||"";
-  if(!merchant){ const m=t.match(/(?:特店|商店|商家|商戶|店家)\s*[:：]?\s*([^\s,，。;；]+)/) || t.match(/(?:於|在)\s*([^\s,，。;；\d][^\s,，。;；]{0,15}?)\s*(?:消費|刷卡|交易|付款)/); if(m) merchant=m[1]; }
-  if(!merchant){ const hit=MLIST.find(x=>t.toLowerCase().includes(x.n.toLowerCase())); if(hit) merchant=hit.n; }
-  merchant = merchant.replace(/購物$|股份有限公司$/,"");
-  let last4 = (kv["末四碼"]||"").replace(/\D/g,"");
-  if(!last4){ const m=t.match(/(?:末四碼|末4碼|尾號|卡號末?)\D{0,6}(\d{4})/) || t.match(/[*＊xX•]{2,}\s?(\d{4})/); if(m) last4=m[1]; }
-  const cardName = kv["卡"]||kv["卡片"]||"";
-  let card = S.cards.find(c=>last4 && c.last4===last4) || S.cards.find(c=>cardName && (cardName.includes(c.name)||c.name.includes(cardName))) || S.cards.find(c=>t.includes(c.name));
-  const wallet = (kv["付款"] && WALLETS.find(w=>kv["付款"].includes(w))) || WALLETS.slice(1).find(w=>t.toLowerCase().includes(w.toLowerCase())) || "實體卡";
-  const foreign = /USD|JPY|EUR|KRW|國外|海外|外幣/i.test(t);
-  let date = todayStr();
-  const dm = (kv["日期"]||t).match(/(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/) || (kv["日期"]||t).match(/(?<!\d)(\d{1,2})\/(\d{1,2})(?!\d)/);
-  if(dm){ date = dm.length===4 ? `${dm[1]}-${pad(dm[2])}-${pad(dm[3])}` : `${NOW.getFullYear()}-${pad(dm[1])}-${pad(dm[2])}`; }
-  const source = kv["來源"] || (kv["金額"]?"iPhone 捷徑":"貼上的通知");
-  const conf = amt && merchant ? "ok" : amt ? "meh" : "bad";
-  return {amt, merchant:canonMerchant(merchant), last4, card, wallet, foreign, date, source, conf};
-}
-function suggestBag(merchant){
-  if(merchant){
-    const cnt={}; S.txns.filter(t=>t.merchant && canonMerchant(t.merchant)===merchant).forEach(t=>cnt[t.bag]=(cnt[t.bag]||0)+1);
-    const top = Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
-    if(top && top[1]>=3 && S.bags.some(b=>b.id===top[0])) return {bag:top[0], why:`依之前 ${top[1]} 筆一樣是「${merchant}」的消費，建議記在「${bagOf(top[0]).name}」`};
-    const ch = channelOfMerchant(merchant); const b = ch && S.bags.find(b=>b.channel===ch);
-    if(b) return {bag:b.id, why:`「${merchant}」看起來是${ch}，建議記在「${b.name}」`};
-  }
-  return {bag:S.bags[0]?.id, why:"還猜不到，先放在第一個袋子，你可以換"};
-}
-function b64urlDecode(s){
-  s = s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="=";
-  const bin = atob(s); const bytes = Uint8Array.from(bin,c=>c.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
-}
-function takeHash(){
-  const h = (location.hash||"").slice(1);
-  const m = h.match(/^add-([A-Za-z0-9_-]+)$/); if(!m) return;
-  if(S.seen.includes(m[1])) return;
-  try{
-    const raw = b64urlDecode(m[1]);
-    S.inbox.push({id:uid(),raw,at:Date.now()});
-    S.seen = [...S.seen.slice(-40), m[1]];
-    persist(); toast(`${TH.hi}！收到一筆自動記帳，等你確認`);
-    try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}
-  }catch(e){ toast("自動記帳的連結讀不懂，檢查一下捷徑的 Base64 步驟"); }
-}
-window.addEventListener("hashchange",()=>{ takeHash(); render(); });
 
 /* ---------------- charts ---------------- */
 function donut(slices,total,label="已花"){
@@ -705,10 +648,9 @@ const TABS = [["home","首頁","home"],["detail","明細","list"],["add","記一
 function render(){
   const pages = {home:pageHome, detail:pageDetail, cards:pageCards, assets:pageAssets, goals:pageGoals};
   app.innerHTML = (pages[UI.tab]||pageHome)() + `<div class="sync" id="sync">${esc(syncNote)}</div>`;
-  const pending = S.inbox.length;
   document.getElementById("dock").innerHTML = TABS.map(([k,l,i])=> k==="add"
     ? `<button type="button" class="add" data-act="entry" aria-label="記一筆"><span class="circle">${ic("plus")}</span>${l}</button>`
-    : `<button type="button" data-act="tab" data-tab="${k}" ${UI.tab===k?'aria-current="page"':""}>${ic(i)}${l}${k==="home"&&pending?`<span class="dbadge">${pending}</span>`:""}</button>`).join("");
+    : `<button type="button" data-act="tab" data-tab="${k}" ${UI.tab===k?'aria-current="page"':""}>${ic(i)}${l}</button>`).join("");
 }
 function paintSync(){ const el=document.getElementById("sync"); if(el) el.textContent=syncNote; }
 const sampleBar = () => S.sample ? `<div class="sample"><span>這些是範例資料</span><button type="button" data-act="clearSample">清空，開始記我的帳</button></div>` : "";
@@ -725,8 +667,6 @@ function pageHome(){
     <div class="big num"><small>$</small>${fmt(W.cs)}</div>
     <div class="sub">平均每天可以花 <b class="num" style="font-size:18px;color:var(--ink)">$${fmt(W.cs/days)}</b>，還有 ${days} 天</div>
     <div class="pills">
-      ${MODE==="app"?`<button type="button" class="pill" data-act="paste">${ic("inbox")} 貼上刷卡</button>`:""}
-      ${S.inbox.length?`<button type="button" class="pill hot" data-act="inbox">${ic("inbox")} ${S.inbox.length} 筆待確認</button>`:""}
       ${due?`<button type="button" class="pill" data-act="tab" data-tab="cards">${ic("card")} 卡費待繳 <b class="num">${fmt(due)}</b></button>`:""}
       <button type="button" class="pill" data-act="fall" aria-expanded="${UI.showFall}">帳上 <b class="num">${fmt(W.total)}</b>，怎麼算的 ${UI.showFall?"▴":"▾"}</button>
     </div>
@@ -737,7 +677,6 @@ function pageHome(){
       ${W.un<0?`<div class="warn">預算袋比手上的現金多了 ${fmt(-W.un)}，把袋子調小一點會比較安全。</div>`:""}
     </div>`:""}
   </section>
-  ${S.inbox.length?`<button type="button" class="banner" data-act="inbox"><span class="badge">${S.inbox.length}</span><span class="grow"><b>自動抓到的交易，等你確認</b><br><span class="label">${esc(parseText(S.inbox[0].raw).merchant||"未知商家")} NT$ ${fmt(parseText(S.inbox[0].raw).amt)}</span></span>${ic("right")}</button>`:""}
   <div class="st"><h3>這筆花在哪裡？</h3><button type="button" class="link" data-act="editBags">調整袋子</button></div>
   <div class="bags">${S.bags.map((b,i)=>{ const s=sp[b.id]||0, left=b.budget-s, p=b.budget?Math.min(100,s/b.budget*100):0;
     return `<button type="button" class="bag ${left<0?"over":""}" data-act="entry" data-bag="${b.id}" aria-label="記在${esc(b.name)}">
@@ -818,41 +757,9 @@ function pageCards(){
       <div class="grid3"><div><div class="label">本月刷</div><b class="num" style="font-size:20px">${fmt(m.spend)}</b></div><div><div class="label">本月回饋</div><b class="num" style="font-size:20px;color:var(--down)">${fmt2(m.total)}</b></div><div><div class="label">卡費待繳</div><b class="num" style="font-size:20px">${fmt(due)}</b></div></div>
       ${c.rules.map(r=>{ const usedR=m.used[r.id]||0, left=r.cap>0?Math.max(0,r.cap-usedR):null; return `<div class="pr"><div class="between" style="font-size:14px"><span>${esc(r.name)} ${r.rate}%</span><span class="muted">${left==null?"沒有上限":left>0?`還可刷 <b class="num" style="color:var(--ink)">${fmt(left*100/r.rate)}</b>`:"加碼用完了"}</span></div>${r.cap>0?`<div class="bar thin"><i style="width:${Math.min(100,usedR/r.cap*100)}%;background-color:var(--a2)"></i></div>`:""}</div>`; }).join("")}
       ${due?`<div class="between"><span class="label">繳清後會從「${esc(S.accounts[0]?.name||"帳戶")}」扣掉</span><button type="button" class="btn sm soft" data-act="payCard" data-card="${c.id}">繳清 ${fmt(due)}</button></div>`:""}
-    </section>`; }).join("")}
-  <div class="st"><h3>自動記帳怎麼設定</h3></div>
-  <section class="sheet alt" style="display:flex;flex-direction:column;gap:10px">
-    ${MODE==="app"?appShortcut():`    <div class="row">${ic("phone")}<b>iPhone 捷徑：用 Apple Pay 刷完自動送進來</b></div>
-    <ol class="steps">
-      <li>打開「捷徑」App → 自動化 → 新增 → 選「錢包」，勾你的卡，選「立即執行」。</li>
-      <li>加入「文字」動作，內容填：<pre class="code">金額=[金額]|商家=[商家]|卡=[卡片或票卡]|來源=iPhone 捷徑|付款=Apple Pay</pre>方括號的地方點選「捷徑輸入」裡對應的變數。</li>
-      <li>加入「Base64 編碼」，換行選「無」。</li>
-      <li>加入三個「取代文字」：把 <code>+</code> 換成 <code>-</code>、<code>/</code> 換成 <code>_</code>、<code>=</code> 換成空白。</li>
-      <li>加入「打開 URL」：<pre class="code">${esc(ARTIFACT_URL)}#add-</pre>後面接上一步的結果。</li>
-    </ol>
-`}
-    <div class="row">${ic("inbox")}<b>其他卡：貼上銀行通知</b></div>
-    <div class="label">收到刷卡簡訊、App 推播或 Email 時，複製整段文字，到首頁的「待確認」貼上，會自動讀出金額、商家和卡片末四碼。</div>
-    <button type="button" class="btn ghost" data-act="inbox">${ic("inbox")} 打開待確認，試貼一段</button>
-  </section>`;
+    </section>`; }).join("")}`;
 }
 
-function appShortcut(){ return `<div class="row">${ic("phone")}<b>iPhone 捷徑：用 Apple Pay 刷完自動複製</b></div>
-    <ol class="steps">
-      <li>打開「捷徑」App → 自動化 → 新增 → 選「錢包」，勾你的卡，選「立即執行」。</li>
-      <li>加入「文字」動作，內容填：<pre class="code">金額=[金額]|商家=[商家]|卡=[卡片或票卡]|來源=iPhone 捷徑|付款=Apple Pay</pre>方括號的地方點選「捷徑輸入」裡對應的變數。</li>
-      <li>加入「拷貝到剪貼板」。</li>
-      <li>加入「顯示通知」，內容寫：已複製，打開${TH.name}按「貼上刷卡」。</li>
-    </ol>
-    <div class="label">刷完卡會跳通知。打開 App 按首頁的「貼上刷卡」，這筆就會進到待確認，選袋子按一下就記好了。</div>`; }
-async function pasteClipboard(){
-  try{
-    const t = (await navigator.clipboard.readText()).trim();
-    if(!t){ toast("剪貼簿是空的"); return; }
-    const p = parseText(t);
-    if(!(p.amt>0)){ toast("剪貼簿裡看不到金額，確認一下捷徑有沒有複製成功"); return; }
-    S.inbox.push({id:uid(),raw:t,at:Date.now()}); persist(); render(); openInbox();
-  }catch(e){ toast("讀不到剪貼簿，請到待確認手動貼上"); openInbox(); }
-}
 function exportBackup(){
   const data = JSON.stringify({app:"cute-ledger",theme:THEME,at:new Date().toISOString(),state:S});
   const name = `${TH.name}-備份-${todayStr()}.json`;
@@ -1041,45 +948,6 @@ function openEntry(pre={}){
   });
 }
 
-function openInbox(){
-  const draw = () => {
-    const items = S.inbox.map(it=>({it,p:parseText(it.raw)}));
-    openDrawer(`${head(`${ic("inbox")} 待確認的交易`)}
-      ${items.length?items.map(({it,p})=>{ const sg=suggestBag(p.merchant); return `<section class="sheet" style="border-top:6px solid var(--a2);display:flex;flex-direction:column;gap:6px" data-item="${it.id}">
-        <div class="between"><b class="num" style="font-size:26px">NT$ ${fmt(p.amt)}</b><span class="label num">${p.date}</span></div>
-        <b>${esc(p.merchant||"看不出商家")}</b>
-        <div class="chips"><span class="tag">${esc(p.source)}</span>${p.card?`<span class="tag">${esc(p.card.name)}・末四碼 ${esc(p.card.last4)}</span>`:p.last4?`<span class="tag">末四碼 ${esc(p.last4)}（還沒登記這張卡）</span>`:""}${p.wallet!=="實體卡"?`<span class="tag">${esc(p.wallet)}</span>`:""}<span class="tag ${p.conf==="ok"?"ok":"meh"}">${p.conf==="ok"?"讀得很清楚":p.conf==="meh"?"金額有讀到，商家沒讀到":"看不太懂"}</span></div>
-        <div class="label">${esc(sg.why)}</div>
-        <details class="label"><summary>原始文字</summary>${esc(it.raw)}</details>
-        <div class="label">從哪一袋扣：</div>
-        <div class="pickbags">${S.bags.map((b,i)=>`<button type="button" data-inbag="${b.id}" aria-pressed="${b.id===sg.bag}"><span class="tile" style="background:${bagColor(b.id)};width:28px;height:28px">${ic(b.icon)}</span>${esc(b.name)}</button>`).join("")}</div>
-        <div class="row"><button type="button" class="btn" data-confirm ${p.amt>0?"":"disabled"}>${ic("check")} 記成新消費</button><button type="button" class="btn ghost" data-skip>略過</button></div>
-      </section>`; }).join(""):`<div class="empty">目前沒有待確認的交易 ${TH.hi}～</div>`}
-      <section class="sheet alt" style="display:flex;flex-direction:column;gap:8px">
-        <b>貼上銀行通知</b>
-        <textarea class="inp" id="pasteBox" rows="3" placeholder="例如：您的信用卡末四碼8888於09/27消費新臺幣245元，特店：Uber"></textarea>
-        <button type="button" class="btn soft" id="pasteGo">${ic("spark")} 讀取這段文字</button>
-      </section>`, d=>{
-      const pick = {}; items.forEach(({it,p})=>pick[it.id]=suggestBag(p.merchant).bag);
-      d.addEventListener("click",e=>{
-        const sec=e.target.closest("[data-item]"); const b=e.target.closest("button");
-        if(b?.id==="pasteGo"){ const v=d.querySelector("#pasteBox").value.trim(); if(!v) return; S.inbox.push({id:uid(),raw:v,at:Date.now()}); persist(); draw(); render(); return; }
-        if(!sec||!b) return;
-        const id=sec.dataset.item, it=S.inbox.find(x=>x.id===id); if(!it) return;
-        if(b.dataset.inbag){ pick[id]=b.dataset.inbag; sec.querySelectorAll("[data-inbag]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.inbag===pick[id])); }
-        if("skip" in b.dataset){ S.inbox=S.inbox.filter(x=>x.id!==id); persist(); render(); draw(); }
-        if("confirm" in b.dataset){
-          const p=parseText(it.raw);
-          S.inbox=S.inbox.filter(x=>x.id!==id);
-          recordTx({id:uid(),bag:pick[id],amt:p.amt,merchant:p.merchant,pay:p.card?"card:"+p.card.id:"acc:"+S.accounts[0]?.id,wallet:p.wallet,foreign:p.foreign,channel:null,date:p.date,ts:Date.now(),src:"auto"});
-          draw();
-        }
-      });
-    });
-  };
-  draw();
-}
-
 const swatches = cur => `<div class="swatches">${SWATCHES.map(c=>`<button type="button" data-color="${c}" aria-pressed="${cur===c}" style="background:${c}" aria-label="顏色 ${c}"></button>`).join("")}</div>`;
 function openBags(){
   const draft = S.bags.map(b=>({...b}));
@@ -1235,11 +1103,9 @@ document.addEventListener("click",e=>{
   switch(a){
     case "tab": setTab(b.dataset.tab); break;
     case "entry": openEntry({bag:b.dataset.bag}); break;
-    case "inbox": openInbox(); break;
     case "fall": UI.showFall=!UI.showFall; render(); break;
     case "editBags": openBags(); break;
     case "editFixed": openFixed(); break;
-    case "paste": pasteClipboard(); break;
     case "export": exportBackup(); break;
     case "payFixed": { const f=S.fixed.find(x=>x.id===b.dataset.id); if(f) recordTx(fixedTx(f,todayStr())); break; }
     case "delTx": { const t=S.txns.find(x=>x.id===b.dataset.id); if(!t) break; removeTx(t.id); toast("刪掉了", ()=>recordTxSilent(t)); break; }
