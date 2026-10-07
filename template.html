@@ -190,7 +190,7 @@ pre.code{white-space:pre-wrap;padding:8px;margin:4px 0 0}
 .dock nav>button[aria-current="page"]{color:var(--ink)}
 .dock nav>button[aria-current="page"]::before{content:"";position:absolute;top:1px;width:34px;height:28px;background:var(--a2);border-radius:50% 45% 55% 48%;z-index:-1}
 .dock nav>button{z-index:0}
-.dock .add{margin-top:-24px}
+.dock .add{margin-top:-24px;align-self:center}
 .dock .add span.circle{width:54px;height:54px;border-radius:50% 46% 52% 48%;background:var(--a1);border:2.5px solid var(--ink);box-shadow:2px 3px 0 var(--ink);display:grid;place-items:center;color:var(--ink)}
 .dock .add .ic{width:28px;height:28px;stroke-width:2.8}
 .dock .dbadge{position:absolute;top:0;right:calc(50% - 20px);min-width:18px;height:18px;border-radius:9px;background:var(--danger);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 4px;font-family:var(--num);font-weight:700;border:1.5px solid var(--ink)}
@@ -576,7 +576,7 @@ function render(){
   const pages = {home:pageHome, detail:pageDetail, cards:pageCards, assets:pageAssets};
   app.innerHTML = (pages[UI.tab]||pageHome)() + `<div class="sync" id="sync">${esc(syncNote)}</div>`;
   document.getElementById("dock").innerHTML = TABS.map(([k,l,i])=> k==="add"
-    ? `<button type="button" class="add" data-act="entry" aria-label="記一筆"><span class="circle">${ic("plus")}</span>${l}</button>`
+    ? `<button type="button" class="add" data-act="entry" aria-label="記一筆"><span class="circle">${ic("plus")}</span></button>`
     : `<button type="button" data-act="tab" data-tab="${k}" ${UI.tab===k?'aria-current="page"':""}>${ic(i)}${l}</button>`).join("");
 }
 function paintSync(){ const el=document.getElementById("sync"); if(el) el.textContent=syncNote; }
