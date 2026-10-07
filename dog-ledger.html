@@ -201,6 +201,7 @@ pre.code{white-space:pre-wrap;padding:8px;margin:4px 0 0}
 .scrim{position:fixed;inset:0;background:rgba(40,30,50,.35);z-index:10}
 .drawer{position:fixed;left:0;right:0;bottom:0;z-index:11;max-width:480px;margin:0 auto;background:var(--paper);border:3px solid var(--ink);border-bottom:none;border-radius:28px 30px 0 0 / 24px 26px 0 0;padding:10px 16px calc(14px + env(safe-area-inset-bottom,0px));max-height:94vh;overflow:auto;display:flex;flex-direction:column;gap:10px;animation:up .2s ease-out}
 @keyframes up{from{transform:translateY(40px);opacity:.4}}
+.drawer>*{flex-shrink:0}
 .drawer .grip{width:46px;height:5px;background:var(--ink);border-radius:4px;margin:0 auto;opacity:.35}
 .drawer h4{margin:0;font-size:19px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .x{border:2px solid var(--ink);background:var(--card);border-radius:50%;width:32px;height:32px;display:grid;place-items:center;flex:none}
@@ -227,6 +228,19 @@ pre.code{white-space:pre-wrap;padding:8px;margin:4px 0 0}
 .swatches{display:flex;flex-wrap:wrap;gap:7px}
 .swatches button{width:30px;height:30px;border:2px solid var(--ink);border-radius:50% 45% 55% 48%}
 .swatches button[aria-pressed="true"]{box-shadow:0 0 0 3px var(--paper),0 0 0 5px var(--ink)}
+.cal{background:var(--card);border:2.5px solid var(--ink);border-radius:var(--wob);box-shadow:3px 4px 0 var(--ink);padding:10px 12px 12px}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-head b{font-size:17px}
+.cal-head .x:disabled{opacity:.3}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal-grid .wd{font-size:13px;color:var(--ink-soft);padding-bottom:2px}
+.cal-grid .wd.we{color:var(--a1)}
+.cd{font-family:var(--num);font-weight:700;font-size:19px;aspect-ratio:1;max-width:100%;border:2px solid transparent;border-radius:50% 45% 55% 48%;display:grid;place-items:center;color:var(--ink)}
+.cd:nth-child(odd){border-radius:45% 55% 48% 52%}
+.cd.today{border:2px dashed var(--ink)}
+.cd.sel{background:var(--a1);border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink)}
+.cd:disabled{opacity:.25;cursor:default}
+.cal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:13px;color:var(--ink-soft)}
 .erow{border:2px dashed var(--ink);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:8px;background:var(--card)}
 .toast{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%) rotate(-1deg);background:var(--a2);border:2.5px solid var(--ink);border-radius:var(--wob2);box-shadow:3px 3px 0 var(--ink);padding:7px 14px;z-index:20;font-size:15px;display:flex;gap:10px;align-items:center;max-width:calc(100% - 32px)}
 .toast button{border:2px solid var(--ink);border-radius:8px;background:var(--card);padding:1px 8px;font-size:13px}
@@ -292,6 +306,7 @@ const I = {
   wallet:'<path d="M5 10c7-1 16-1 22 0v15c-6 1-15 1-22 0z"/><path d="M5 10l15-4 2 4"/><path d="M20 16h7v5h-7c-1.5 0-2.5-1-2.5-2.5S18.5 16 20 16z"/>',
   back:'<path d="M9 12H20a6 6 0 0 1 0 12h-6"/><path d="M13 7l-5 5 5 5"/>',
   copy:'<path d="M11 11h14v15H11z"/><path d="M7 21V6h13"/>',
+  cal:'<path d="M6 8.5c7-.6 13-.6 20 0 .5 6 .5 12 0 18-7 .6-13 .6-20 0-.5-6-.5-12 0-18z"/><path d="M6 13.5h20M11 5v6M21 5v6"/><circle cx="12" cy="19" r="1.2" fill="currentColor"/><circle cx="16" cy="19" r="1.2" fill="currentColor"/><circle cx="20" cy="19" r="1.2" fill="currentColor"/>',
   bolt:'<path d="M18 4L7 18h8l-2 10 11-14h-8z"/>',
   yoga:'<circle cx="16" cy="6.5" r="2.6"/><path d="M16 9.5v8"/><path d="M8 11c3 2 5 2.5 8 2.5s5-.5 8-2.5"/><path d="M16 17.5c-3 1-6 3-8 6 4 .5 6 .5 8-1.5 2 2 4 2 8 1.5-2-3-5-5-8-6z"/>',
   signal:'<path d="M16 16v11"/><circle cx="16" cy="14" r="2"/><path d="M11 9a7 7 0 0 0 0 10M21 9a7 7 0 0 1 0 10M7 5.5a12 12 0 0 0 0 17M25 5.5a12 12 0 0 1 0 17"/>',
@@ -792,6 +807,16 @@ function removeTx(id){
   persist(); render();
 }
 
+const WEEK = "日一二三四五六";
+function calHtml(ym, sel){
+  const [y,m] = ym.split("-").map(Number), first = new Date(y,m-1,1).getDay(), today = todayStr();
+  let cells = "<span></span>".repeat(first);
+  for(let d=1; d<=daysIn(ym); d++){ const v=`${ym}-${pad(d)}`; cells += `<button type="button" class="cd${v===sel?" sel":""}${v===today?" today":""}" data-pick-date="${v}" ${v>today?"disabled":""}>${d}</button>`; }
+  return `<div class="cal-head"><button type="button" class="x" data-cal="-1" aria-label="上個月">${ic("left")}</button><b>${y} 年 ${m} 月</b><button type="button" class="x" data-cal="1" aria-label="下個月" ${ym>=MONTH?"disabled":""}>${ic("right")}</button></div>
+    <div class="cal-grid">${[...WEEK].map((w,i)=>`<span class="wd ${i===0||i===6?"we":""}">${w}</span>`).join("")}${cells}</div>
+    <div class="cal-foot"><span>虛線圈是今天</span><button type="button" class="btn sm soft" data-day="0">回到今天</button></div>`;
+}
+const dateLabel = v => { const d=new Date(v+"T12:00"); return `${d.getMonth()+1}/${d.getDate()}（${WEEK[d.getDay()]}）`; };
 function openEntry(pre={}){
   if(!S.bags.length){ toast("先新增一個預算袋"); return; }
   const E = {bag:pre.bag||S.bags[0].id, amt:pre.amt?String(pre.amt):"", pay:pre.pay||("acc:"+((S.accounts.find(a=>a.id==="cash")||S.accounts[0])?.id)), wallet:pre.wallet||"實體卡", foreign:!!pre.foreign, merchant:pre.merchant||""};
@@ -802,7 +827,8 @@ function openEntry(pre={}){
     <h4><span class="row" id="eTitle"></span><button type="button" class="x" data-close aria-label="關閉">${ic("close")}</button></h4>
     <div class="chips scroll" id="eBags">${S.bags.map((b,i)=>`<button type="button" class="chip" data-pick="${b.id}"><span style="color:var(--ink)">${ic(b.icon)}</span>${esc(b.name)}</button>`).join("")}</div>
     <div class="display"><div class="after" id="eAfter"></div><div class="amt num" id="eAmt">0</div></div>
-    <div class="chips scroll" id="eDates"><button type="button" class="chip" data-day="0">今天</button><button type="button" class="chip" data-day="1">昨天</button><label class="chip" style="cursor:pointer">${ic("list")}<input type="date" id="eDate" max="${todayStr()}" value="${E.date}" style="border:none;background:none;font:inherit;color:inherit;padding:0" aria-label="選日期"></label></div>
+    <div class="chips scroll" id="eDates"><button type="button" class="chip" data-day="0">今天</button><button type="button" class="chip" data-day="1">昨天</button><button type="button" class="chip" id="eDateBtn" data-cal-toggle aria-expanded="false"></button></div>
+    <div class="cal" id="eCal" hidden></div>
     <div class="chips scroll">${pays.map(([k,l])=>`<button type="button" class="chip" data-pay="${k}">${k.startsWith("card")?ic("card"):ic("wallet")}${esc(l)}</button>`).join("")}</div>
     <div class="chips scroll" id="eMer"></div>
     <input class="inp" id="eNote" maxlength="30" placeholder="細項或備註（選填）" value="${esc(E.merchant)}">
@@ -815,7 +841,8 @@ function openEntry(pre={}){
       d.querySelectorAll("[data-pay]").forEach(c=>c.setAttribute("aria-pressed",c.dataset.pay===E.pay));
       $("#eAmt").textContent = E.amt||"0";
       d.querySelectorAll("[data-day]").forEach(c=>c.setAttribute("aria-pressed",E.date===dayAgo(+c.dataset.day)));
-      const dl=d.querySelector("#eDate").closest(".chip"); dl.setAttribute("aria-pressed", E.date!==dayAgo(0)&&E.date!==dayAgo(1));
+      const db=$("#eDateBtn"); db.innerHTML=`${ic("cal")} ${dateLabel(E.date)}`; db.setAttribute("aria-pressed", E.date!==dayAgo(0)&&E.date!==dayAgo(1)); db.setAttribute("aria-expanded", !!E.calOpen);
+      $("#eCal").hidden = !E.calOpen; if(E.calOpen) $("#eCal").innerHTML = calHtml(E.calYm, E.date);
       $("#eAfter").innerHTML = `${+eym.slice(5)} 月剩 <span class="num">${fmt(left)}</span> → <span class="num" style="color:${left-v<0?"var(--danger)":"var(--ink)"}">${fmt(left-v)}</span>`;
       $("#eGo").disabled = !(v>0);
       const items = b.items || [];
@@ -824,7 +851,10 @@ function openEntry(pre={}){
     };
     d.addEventListener("click",e=>{
       const t=e.target.closest("button"); if(!t) return;
-      if(t.dataset.day!=null){ E.date=dayAgo(+t.dataset.day); d.querySelector("#eDate").value=E.date; }
+      if(t.dataset.day!=null){ E.date=dayAgo(+t.dataset.day); E.calOpen=false; }
+      else if("calToggle" in t.dataset){ E.calOpen=!E.calOpen; E.calYm=E.date.slice(0,7); }
+      else if(t.dataset.cal){ const n=addMonths(E.calYm,+t.dataset.cal); if(n<=MONTH) E.calYm=n; }
+      else if(t.dataset.pickDate){ E.date=t.dataset.pickDate; E.calOpen=false; }
       else if(t.dataset.pick) E.bag=t.dataset.pick;
       else if(t.dataset.pay) E.pay=t.dataset.pay;
       else if(t.dataset.mer) $("#eNote").value=t.dataset.mer;
@@ -844,7 +874,6 @@ function openEntry(pre={}){
       upd();
     });
     d.addEventListener("input",e=>{ if(e.target.id==="eNote") upd(); });
-    d.addEventListener("change",e=>{ if(e.target.id==="eDate" && e.target.value){ E.date = e.target.value>todayStr()?todayStr():e.target.value; e.target.value=E.date; upd(); } });
     upd();
   });
 }
