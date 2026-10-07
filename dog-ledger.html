@@ -186,7 +186,7 @@ pre.code{white-space:pre-wrap;padding:8px;margin:4px 0 0}
 
 /* dock */
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:0 10px calc(8px + env(safe-area-inset-bottom,0px));pointer-events:none}
-.dock nav{pointer-events:auto;max-width:460px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr);align-items:end;background:var(--card);border:2.5px solid var(--ink);border-radius:26px 30px 24px 28px / 24px 26px 30px 26px;box-shadow:3px 4px 0 var(--ink);padding:6px 4px 5px}
+.dock nav{pointer-events:auto;max-width:460px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);align-items:end;background:var(--card);border:2.5px solid var(--ink);border-radius:26px 30px 24px 28px / 24px 26px 30px 26px;box-shadow:3px 4px 0 var(--ink);padding:6px 4px 5px}
 .dock nav>button{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;color:var(--ink-soft);padding:4px 0;position:relative}
 .dock nav>button .ic{width:24px;height:24px}
 .dock nav>button[aria-current="page"]{color:var(--ink)}
@@ -373,8 +373,6 @@ function sampleState(){
   for(let m=1;m<=12;m++){ v += 2500 + ((m*7919)%3000) - (m===7?7000:0); log[`${y-1}-${pad(m)}`]=v; }
   for(let m=1;m<NOW.getMonth()+1;m++){ v += 3000 + ((m*6151)%3000) - (m===4?5000:0); log[`${y}-${pad(m)}`]=v; }
   const shift = 78000 - v; for(const k in log) log[k] += shift;
-  const portLog = {};
-  for(let i=20;i>=1;i--){ const d=new Date(NOW); d.setDate(d.getDate()-i); portLog[`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`] = 108000 + Math.round(Math.sin(i/2.5)*2200 + (20-i)*180); }
   return {
     v:2, sample:true,
     bags:[
@@ -392,13 +390,7 @@ function sampleState(){
       {id:"c2",name:"網購卡",last4:"1234",limit:50000,closeDay:15,payDay:3,paidTs:0,color:"#8EC3F0"},
       {id:"c3",name:"旅遊卡",last4:"5678",limit:60000,closeDay:25,payDay:10,paidTs:0,color:"#D6B8F2"},
     ],
-    stocks:[
-      {id:uid(),sym:"0050",name:"元大台灣50",shares:200,cost:95,price:112,prev:111.5,ccy:"TWD"},
-      {id:uid(),sym:"2330",name:"台積電",shares:20,cost:1800,price:2475,prev:2500,ccy:"TWD"},
-      {id:uid(),sym:"VT",name:"全球股票 ETF",shares:10,cost:105,price:128.4,prev:127.9,ccy:"USD"},
-    ],
-    fx:{USD:30.5}, portLog,
-    goals:{targets:{[y-1]:45000,[y]:60000}, includeStocks:false,
+    goals:{targets:{[y-1]:45000,[y]:60000},
       items:[{id:uid(),icon:"plane",name:"日本旅行",target:40000,saved:12000},{id:uid(),icon:"tooth",name:"牙齒矯正",target:30000,saved:5400}]},
     savingsLog:log, fixed:defaultFixed(),
     txns,
@@ -406,9 +398,9 @@ function sampleState(){
 }
 function blankState(){
   const s=sampleState(), y=NOW.getFullYear();
-  return {...s, sample:false, txns:[], stocks:[], portLog:{}, savingsLog:{},
+  return {...s, sample:false, txns:[], savingsLog:{},
     accounts:[{id:"bank",name:"薪轉帳戶",balance:0},{id:"cash",name:"錢包現金",balance:0}],
-    reserves:{save:0,buffer:0}, goals:{targets:{[y]:0},includeStocks:false,items:[]},
+    reserves:{save:0,buffer:0}, goals:{targets:{[y]:0},items:[]},
     cards:s.cards.map(c=>({...c,paidTs:Date.now()}))};
 }
 
@@ -430,7 +422,6 @@ function splitDocs(s){
 function persist(){
   // keep this month's savings snapshot current (only on real user changes)
   S.savingsLog[MONTH] = savingsNow();
-  const pv = stockTotal(); if(S.stocks.length) S.portLog[todayStr()] = Math.round(pv);
   try{ localStorage.setItem(LSK, JSON.stringify(S)); }catch(e){}
   if(!remote) return;
   clearTimeout(persist.t);
@@ -466,26 +457,6 @@ async function boot(){
     syncNote = "已同步到你的帳號，換裝置也看得到，只有你看得到";
   }catch(e){ if(remote===null && MODE!=="app") syncNote="目前存在這台裝置的瀏覽器裡"; }
   autoFixed(); render();
-  if(MODE==="app") updatePrices();
-}
-async function updatePrices(){
-  try{
-    const r = await fetch("../prices.json", {cache:"no-store"});
-    if(!r.ok) return;
-    const data = await r.json(), q = data.quotes || {};
-    let changed = 0;
-    for(const st of S.stocks){
-      if(st.ccy!=="TWD") continue;
-      const hit = q[String(st.sym).trim().toUpperCase()];
-      if(!hit) continue;
-      const [close, prev, name] = hit;
-      if(close && (st.price!==close || (prev && st.prev!==prev))){ st.price=close; if(prev) st.prev=prev; changed++; }
-      if(!st.name && name) st.name = name;
-    }
-    const newDate = data.date || S.pricesDate;
-    if(changed || newDate!==S.pricesDate){ S.pricesDate = newDate; persist(); render(); }
-    if(changed) toast(`${TH.hi}！${changed} 檔台股已更新到 ${String(newDate).slice(5).replace("-","/")} 收盤價`);
-  }catch(e){ /* 離線時沿用上次價格 */ }
 }
 
 /* ---------------- derived numbers ---------------- */
@@ -509,21 +480,17 @@ function autoFixed(){
 }
 const bagIndex = id => Math.max(0,S.bags.findIndex(b=>b.id===id));
 const accTotal = () => S.accounts.reduce((s,a)=>s+a.balance,0);
-const stockVal = s => s.shares*s.price*(s.ccy==="USD"?S.fx.USD:1);
-const stockPrev = s => s.shares*(s.prev||s.price)*(s.ccy==="USD"?S.fx.USD:1);
-const stockCost = s => s.shares*s.cost*(s.ccy==="USD"?S.fx.USD:1);
-const stockTotal = () => S.stocks.reduce((s,x)=>s+stockVal(x),0);
 const goalSaved = () => S.goals.items.reduce((s,g)=>s+g.saved,0);
 const cardById = id => S.cards.find(c=>c.id===id);
 const cardDue = c => S.txns.filter(t=>t.pay==="card:"+c.id && t.ts>c.paidTs).reduce((s,t)=>s+t.amt,0);
 const allCardDue = () => S.cards.reduce((s,c)=>s+cardDue(c),0);
-const savingsNow = () => accTotal() - allCardDue() + (S.goals.includeStocks?stockTotal():0);
+const savingsNow = () => accTotal() - allCardDue();
 function canSpend(){ const sp=spentBy(MONTH); return S.bags.reduce((s,b)=>s+Math.max(0,b.budget-(sp[b.id]||0)),0); }
 function waterfall(){
-  const acc=accTotal(), st=stockTotal(), due=allCardDue(), gs=goalSaved(), cs=canSpend();
+  const acc=accTotal(), due=allCardDue(), gs=goalSaved(), cs=canSpend();
   const fp = fixedPending();
   const un = acc - due - fp - gs - S.reserves.save - S.reserves.buffer - cs;
-  return {total:acc+st, rows:[["股票",st,color(1)],["卡費待繳",due,"var(--danger)"],["固定支出（本月還沒扣）",fp,FIXED_COLOR],["目標專款",gs,color(4)],["指定儲蓄",S.reserves.save,color(2)],["安全緩衝",S.reserves.buffer,color(5)],["還沒分配",Math.max(0,un),"var(--ink-soft)"]], cs, un};
+  return {total:acc, rows:[["卡費待繳",due,"var(--danger)"],["固定支出（本月還沒扣）",fp,FIXED_COLOR],["目標專款",gs,color(4)],["指定儲蓄",S.reserves.save,color(2)],["安全緩衝",S.reserves.buffer,color(5)],["還沒分配",Math.max(0,un),"var(--ink-soft)"]], cs, un};
 }
 const payLabel = p => { if(!p) return "現金"; const [k,id]=p.split(":"); if(k==="card"){ const c=cardById(id); return c?c.name:"已刪除的卡"; } const a=S.accounts.find(a=>a.id===id); return a?a.name:"帳戶"; };
 const txChannel = t => t.channel || channelOfMerchant(t.merchant) || bagOf(t.bag).channel || "一般";
@@ -578,19 +545,6 @@ function paceChart(ym){
     ${cc.length?`<circle cx="${x(cc.length)}" cy="${y(endV)}" r="4.5" fill="var(--a2)" stroke="var(--ink)" stroke-width="2"/>`:""}
     ${ticks}</svg>`, endV, prevSame, today: cur[upto-1]||0, upto};
 }
-function spark(vals,W=300,H=70){
-  if(vals.length<2) return `<div class="empty">更新幾天股價後，這裡會畫出走勢</div>`;
-  const min=Math.min(...vals), max=Math.max(...vals), span=max-min||1;
-  const x=i=>6+i/(vals.length-1)*(W-12), y=v=>H-8-(v-min)/span*(H-18);
-  const d = vals.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join("");
-  const up = vals[vals.length-1]>=vals[0];
-  return `<svg class="plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="股票市值走勢">
-    <path d="${d}L${x(vals.length-1)} ${H-4}L${x(0)} ${H-4}Z" fill="${up?"var(--up)":"var(--down)"}" opacity=".12"/>
-    <path d="${d}" fill="none" stroke="${up?"var(--up)":"var(--down)"}" stroke-width="2.5" stroke-linecap="round" filter="url(#rough)"/>
-    <circle cx="${x(vals.length-1)}" cy="${y(vals[vals.length-1])}" r="4" fill="var(--card)" stroke="var(--ink)" stroke-width="2"/>
-    <text x="6" y="10" font-size="10" fill="var(--ink-soft)" font-family="var(--num)">${fmt(max)}</text>
-    <text x="6" y="${H-10}" font-size="10" fill="var(--ink-soft)" font-family="var(--num)">${fmt(min)}</text></svg>`;
-}
 function yearInfo(Y){
   const log=S.savingsLog, cur = y=>m=> (Y===NOW.getFullYear() && m===NOW.getMonth()+1) ? savingsNow() : log[`${y}-${pad(m)}`];
   const vals = Array.from({length:12},(_,i)=>cur(Y)(i+1));
@@ -618,9 +572,10 @@ function yearChart(Y){
 
 /* ---------------- pages ---------------- */
 const app = document.getElementById("app");
-const TABS = [["home","首頁","home"],["detail","明細","list"],["add","記一筆","plus"],["cards","卡片","card"],["assets","資產","stock"],["goals","目標","flag"]];
+const TABS = [["home","首頁","home"],["detail","明細","list"],["add","記一筆","plus"],["cards","卡片","card"],["assets","資產","piggy"]];
 function render(){
-  const pages = {home:pageHome, detail:pageDetail, cards:pageCards, assets:pageAssets, goals:pageGoals};
+  if(UI.tab==="goals") UI.tab="assets";
+  const pages = {home:pageHome, detail:pageDetail, cards:pageCards, assets:pageAssets};
   app.innerHTML = (pages[UI.tab]||pageHome)() + `<div class="sync" id="sync">${esc(syncNote)}</div>`;
   document.getElementById("dock").innerHTML = TABS.map(([k,l,i])=> k==="add"
     ? `<button type="button" class="add" data-act="entry" aria-label="記一筆"><span class="circle">${ic("plus")}</span>${l}</button>`
@@ -645,7 +600,7 @@ function pageHome(){
       <button type="button" class="pill" data-act="fall" aria-expanded="${UI.showFall}">帳上 <b class="num">${fmt(W.total)}</b>，怎麼算的 ${UI.showFall?"▴":"▾"}</button>
     </div>
     ${UI.showFall?`<div class="fall">
-      <div class="fr"><span></span><span>你的帳上有（存款＋股票）</span><b class="num">${fmt(W.total)}</b></div>
+      <div class="fr"><span></span><span>你的帳上有（存款）</span><b class="num">${fmt(W.total)}</b></div>
       ${W.rows.map(([n,v,c])=>`<div class="fr"><i style="background:${c}"></i><span>扣掉 ${n}</span><span class="num">−${fmt(v)}</span></div>`).join("")}
       <div class="fr total"><span></span><span>真正能花的（預算袋剩下的）</span><b class="num">${fmt(W.cs)}</b></div>
       ${W.un<0?`<div class="warn">預算袋比手上的現金多了 ${fmt(-W.un)}，把袋子調小一點會比較安全。</div>`:""}
@@ -763,44 +718,27 @@ function backupSection(){
   </section>`;
 }
 function pageAssets(){
-  const st=stockTotal(), prev=S.stocks.reduce((s,x)=>s+stockPrev(x),0), cost=S.stocks.reduce((s,x)=>s+stockCost(x),0), dChg=st-prev, pl=st-cost;
-  const W=waterfall(); const pts=Object.keys(S.portLog).sort().slice(-30).map(k=>S.portLog[k]);
   return `
-  <div class="pagehead"><h2>資產</h2><span class="chipbtn">USD <button type="button" class="num" data-act="fx" style="text-decoration:underline wavy var(--a1)">${S.fx.USD}</button></span></div>
+  <div class="pagehead"><h2>資產</h2><span class="chipbtn">存款 <b class="num">${fmt(accTotal())}</b></span></div>
   ${sampleBar()}
-  <div class="tiles">
-    <div class="sheet"><div class="label">股票市值 <span class="${dChg>=0?"up":"down"}">${dChg>=0?"▲":"▼"}</span></div><div class="v num">${fmt(st)}</div><div class="label ${dChg>=0?"up":"down"}">今日 ${sgn(dChg)}（${prev?pct(dChg/prev*100):"0%"}）</div></div>
-    <div class="sheet alt" style="background:var(--a1-soft)"><div class="label">還能花・不受影響</div><div class="v num">${fmt(W.cs)}</div><div class="label">股票漲跌不算進能花的錢</div></div>
-  </div>
-  <div class="st"><h3>持股</h3><button type="button" class="link" data-act="editStock">新增持股</button></div>
-  <section class="sheet hold">
-    ${S.stocks.length?S.stocks.map(s=>{ const v=stockVal(s), dc=(s.price-(s.prev||s.price))/(s.prev||s.price)*100, p=v-stockCost(s);
-      return `<button type="button" class="hr" data-act="editStock" data-id="${s.id}">
-        <span><span class="n"><b>${esc(s.sym)}</b> ${esc(s.name)}</span><br><span class="d">${fmt(s.shares)} 股 × ${s.ccy==="USD"?"US$":"$"}${fmt2(s.price)}・成本 ${fmt2(s.cost)}</span></span>
-        <span><span class="v num">${fmt(v)}</span><br><span class="chg ${dc>=0?"up":"down"}">${dc>=0?"▲":"▼"} ${Math.abs(dc).toFixed(2)}%</span></span>
-        <span class="d">損益 <b class="${p>=0?"up":"down"}">${sgn(p)}（${pct(stockCost(s)?p/stockCost(s)*100:0)}）</b></span></button>`; }).join(""):`<div class="empty">還沒有持股</div>`}
-  </section>
-  ${S.stocks.length?`<div class="foot" style="margin:0 4px"><span>總成本 <b>${fmt(cost)}</b></span><span>未實現損益 <b class="${pl>=0?"up":"down"}">${sgn(pl)}（${pct(cost?pl/cost*100:0)}）</b></span></div>`:""}
-  <section class="sheet alt"><div class="between"><span class="label">市值走勢（每次更新股價記一點）</span></div>${spark(pts)}
-    <div class="label" style="margin-top:4px">${MODE==="app"?`台股每個交易日收盤後自動更新${S.pricesDate?`，目前是 ${esc(S.pricesDate.slice(5).replace("-","/"))} 收盤價`:""}。美股或抓不到的代號，點進去手動填價。`:"點一檔持股填入今天的收盤價。"}台股慣例：紅漲綠跌。</div></section>
   <div class="st"><h3>存款帳戶</h3><button type="button" class="link" data-act="editAcc">新增帳戶</button></div>
   <section class="sheet hold">${S.accounts.map(a=>`<button type="button" class="hr" data-act="editAcc" data-id="${a.id}"><span class="n row">${ic("piggy")} ${esc(a.name)}</span><span class="v num">${fmt(a.balance)}</span></button>`).join("")}</section>
   <div class="st"><h3>先留起來的錢</h3></div>
   <section class="sheet alt hold">
-    <button type="button" class="hr" data-act="editRes" data-k="save"><span class="n row">${ic("coin")} 指定儲蓄<br></span><span class="v num">${fmt(S.reserves.save)}</span><span class="d">每月發薪先存起來的錢，不算能花</span></button>
+    <button type="button" class="hr" data-act="editRes" data-k="save"><span class="n row">${ic("coin")} 指定儲蓄</span><span class="v num">${fmt(S.reserves.save)}</span><span class="d">每月發薪先存起來的錢，不算能花</span></button>
     <button type="button" class="hr" data-act="editRes" data-k="buffer"><span class="n row">${ic("heart")} 安全緩衝</span><span class="v num">${fmt(S.reserves.buffer)}</span><span class="d">臨時急用的底，不算能花</span></button>
-    <button type="button" class="hr" data-act="tab" data-tab="goals"><span class="n row">${ic("flag")} 目標專款</span><span class="v num">${fmt(goalSaved())}</span><span class="d">在「目標」頁管理</span></button>
+    <button type="button" class="hr" data-act="toGoals"><span class="n row">${ic("flag")} 目標專款</span><span class="v num">${fmt(goalSaved())}</span><span class="d">在下面「存錢目標」管理</span></button>
   </section>
+  ${goalsSection()}
   ${backupSection()}`;
 }
 
-function pageGoals(){
+function goalsSection(){
   const Y=UI.year, info=yearInfo(Y), ratio = info.target? Math.max(0,Math.min(1,info.saved/info.target)):0;
   const mIdx = Y===NOW.getFullYear()? NOW.getMonth()+1 : 12, should = info.target*mIdx/12;
   const years = [...new Set(Object.keys(S.savingsLog).map(k=>+k.slice(0,4)).concat(Object.keys(S.goals.targets).map(Number)))].sort((a,b)=>b-a);
   return `
-  <div class="pagehead"><h2>目標</h2><div class="stepper"><button type="button" data-act="year" data-d="-1" aria-label="前一年">${ic("left")}</button><span>${Y}</span><button type="button" data-act="year" data-d="1" aria-label="下一年" ${Y>=NOW.getFullYear()?"disabled":""}>${ic("right")}</button></div></div>
-  ${sampleBar()}
+  <div class="st" id="goals"><h3>存錢目標</h3><div class="stepper"><button type="button" data-act="year" data-d="-1" aria-label="前一年">${ic("left")}</button><span>${Y}</span><button type="button" data-act="year" data-d="1" aria-label="下一年" ${Y>=NOW.getFullYear()?"disabled":""}>${ic("right")}</button></div></div>
   <section class="sheet hero" style="text-align:left">
     <div class="tape"></div>${MASCOT}
     <div class="label">${Y} 年已經存了</div>
@@ -809,12 +747,12 @@ function pageGoals(){
     <div class="bar"><i style="width:${ratio*100}%;background-color:var(--a2)"></i></div>
     ${info.target?`<div class="label" style="margin-top:6px">照進度 ${mIdx} 月底應該存到 ${fmt(should)}，${info.saved>=should?`<b class="down">超前 ${fmt(info.saved-should)}</b>`:`<b class="up">還差 ${fmt(should-info.saved)}</b>`}</div>`:""}
   </section>
-  <div class="st"><h3>每月存款的起伏</h3><label class="row hint"><input type="checkbox" id="incStk" data-act="incStocks" ${S.goals.includeStocks?"checked":""}> 含股票</label></div>
+  <div class="st"><h3>每月存款的起伏</h3></div>
   <section class="sheet alt">${yearChart(Y)}
     <div class="foot"><span>起點（去年底）<b>${fmt(info.base)}</b></span><span>最新 <b>${fmt(info.latest)}</b></span></div>
     <div class="months" style="margin-top:8px">${info.vals.map((v,i)=>{ const pv = i? info.vals[i-1] : info.base; const d = v!=null && pv!=null ? v-pv : null; const isNow = Y===NOW.getFullYear()&&i===NOW.getMonth();
       return `<button type="button" class="mo ${isNow?"now":""} ${v==null?"none":""}" data-act="editLog" data-m="${Y}-${pad(i+1)}" ${isNow?"disabled":""}>${i+1} 月${isNow?"（自動）":""}<span class="num">${v==null?"—":fmt(v)}</span>${d!=null?`<span class="${d>=0?"down":"up"}">${d>=0?"▲":"▼"} ${fmt(Math.abs(d))}</span>`:""}</button>`; }).join("")}</div>
-    <div class="label" style="margin-top:6px">存款 = 各帳戶加總 − 卡費待繳${S.goals.includeStocks?" ＋ 股票":""}。這個月的數字會自動更新，過去的月份可以點進去補。</div>
+    <div class="label" style="margin-top:6px">存款 = 各帳戶加總 − 卡費待繳。這個月的數字會自動更新，過去的月份可以點進去補。</div>
   </section>
   <div class="st"><h3>目標專款</h3><button type="button" class="link" data-act="editGoal">新增目標</button></div>
   <section class="sheet">${S.goals.items.length?S.goals.items.map((g,i)=>{ const p=g.target?Math.min(100,g.saved/g.target*100):0; return `<div class="gi">
@@ -845,7 +783,7 @@ function recordTx(tx){
   S.txns.push(tx);
   if(tx.pay?.startsWith("acc:")){ const a=S.accounts.find(a=>a.id===tx.pay.slice(4)); if(a) a.balance-=tx.amt; }
   persist(); render();
-  toast(`記下 ${bagOf(tx.bag).name} NT$${fmt(tx.amt)}`, ()=>{ removeTx(tx.id); });
+  toast(`記下${tx.date!==todayStr()?" "+(+tx.date.slice(5,7))+"/"+(+tx.date.slice(8)):""} ${bagOf(tx.bag).name} NT$${fmt(tx.amt)}`, ()=>{ removeTx(tx.id); });
 }
 function removeTx(id){
   const t=S.txns.find(x=>x.id===id); if(!t) return;
@@ -857,23 +795,28 @@ function removeTx(id){
 function openEntry(pre={}){
   if(!S.bags.length){ toast("先新增一個預算袋"); return; }
   const E = {bag:pre.bag||S.bags[0].id, amt:pre.amt?String(pre.amt):"", pay:pre.pay||("acc:"+((S.accounts.find(a=>a.id==="cash")||S.accounts[0])?.id)), wallet:pre.wallet||"實體卡", foreign:!!pre.foreign, merchant:pre.merchant||""};
+  E.date = pre.date || (UI.tab==="detail" && UI.month<MONTH ? `${UI.month}-${pad(daysIn(UI.month))}` : todayStr());
+  const dayAgo = n => { const d=new Date(); d.setDate(d.getDate()-n); return ds(d); };
   const pays = [...S.accounts.map(a=>["acc:"+a.id,a.name]), ...S.cards.map(c=>["card:"+c.id,c.name])];
   openDrawer(`
     <h4><span class="row" id="eTitle"></span><button type="button" class="x" data-close aria-label="關閉">${ic("close")}</button></h4>
     <div class="chips scroll" id="eBags">${S.bags.map((b,i)=>`<button type="button" class="chip" data-pick="${b.id}"><span style="color:var(--ink)">${ic(b.icon)}</span>${esc(b.name)}</button>`).join("")}</div>
     <div class="display"><div class="after" id="eAfter"></div><div class="amt num" id="eAmt">0</div></div>
+    <div class="chips scroll" id="eDates"><button type="button" class="chip" data-day="0">今天</button><button type="button" class="chip" data-day="1">昨天</button><label class="chip" style="cursor:pointer">${ic("list")}<input type="date" id="eDate" max="${todayStr()}" value="${E.date}" style="border:none;background:none;font:inherit;color:inherit;padding:0" aria-label="選日期"></label></div>
     <div class="chips scroll">${pays.map(([k,l])=>`<button type="button" class="chip" data-pay="${k}">${k.startsWith("card")?ic("card"):ic("wallet")}${esc(l)}</button>`).join("")}</div>
     <div class="chips scroll" id="eMer"></div>
     <input class="inp" id="eNote" maxlength="30" placeholder="細項或備註（選填）" value="${esc(E.merchant)}">
     <div class="keys">${["7","8","9","⌫","4","5","6","GO","1","2","3",".","0","00"].map(k=>k==="GO"?`<button type="button" class="key go" id="eGo" disabled>${ic("check")}記下</button>`:k==="⌫"?`<button type="button" class="key" data-k="⌫" aria-label="刪一個字">${ic("back")}</button>`:`<button type="button" class="key" data-k="${k}">${k}</button>`).join("")}</div>`, d=>{
     const $=s=>d.querySelector(s);
     const upd=()=>{
-      const b=bagOf(E.bag), v=n0(E.amt), left=b.budget-(spentBy(MONTH)[E.bag]||0);
+      const b=bagOf(E.bag), v=n0(E.amt), eym=E.date.slice(0,7), left=b.budget-(spentBy(eym)[E.bag]||0);
       $("#eTitle").innerHTML=`<span class="tile" style="background:${bagColor(E.bag)};width:30px;height:30px">${ic(b.icon)}</span>記在 ${esc(b.name)}`;
       d.querySelectorAll("[data-pick]").forEach(c=>c.setAttribute("aria-pressed",c.dataset.pick===E.bag));
       d.querySelectorAll("[data-pay]").forEach(c=>c.setAttribute("aria-pressed",c.dataset.pay===E.pay));
       $("#eAmt").textContent = E.amt||"0";
-      $("#eAfter").innerHTML = `剩 <span class="num">${fmt(left)}</span> → <span class="num" style="color:${left-v<0?"var(--danger)":"var(--ink)"}">${fmt(left-v)}</span>`;
+      d.querySelectorAll("[data-day]").forEach(c=>c.setAttribute("aria-pressed",E.date===dayAgo(+c.dataset.day)));
+      const dl=d.querySelector("#eDate").closest(".chip"); dl.setAttribute("aria-pressed", E.date!==dayAgo(0)&&E.date!==dayAgo(1));
+      $("#eAfter").innerHTML = `${+eym.slice(5)} 月剩 <span class="num">${fmt(left)}</span> → <span class="num" style="color:${left-v<0?"var(--danger)":"var(--ink)"}">${fmt(left-v)}</span>`;
       $("#eGo").disabled = !(v>0);
       const items = b.items || [];
       const recent = [...new Set(S.txns.filter(t=>t.bag===E.bag&&t.merchant&&!items.includes(t.merchant)).sort((a,b)=>b.ts-a.ts).map(t=>t.merchant))].slice(0,3);
@@ -881,7 +824,8 @@ function openEntry(pre={}){
     };
     d.addEventListener("click",e=>{
       const t=e.target.closest("button"); if(!t) return;
-      if(t.dataset.pick) E.bag=t.dataset.pick;
+      if(t.dataset.day!=null){ E.date=dayAgo(+t.dataset.day); d.querySelector("#eDate").value=E.date; }
+      else if(t.dataset.pick) E.bag=t.dataset.pick;
       else if(t.dataset.pay) E.pay=t.dataset.pay;
       else if(t.dataset.mer) $("#eNote").value=t.dataset.mer;
       else if(t.dataset.k){ const k=t.dataset.k;
@@ -893,13 +837,14 @@ function openEntry(pre={}){
         const v=n0(E.amt); if(!(v>0)) return;
         const note=$("#eNote").value.trim();
         closeDrawer();
-        recordTx({id:uid(),bag:E.bag,amt:v,merchant:note,pay:E.pay,wallet:"",foreign:false,channel:null,date:pre.date||todayStr(),ts:Date.now(),src:pre.src||"manual"});
+        recordTx({id:uid(),bag:E.bag,amt:v,merchant:note,pay:E.pay,wallet:"",foreign:false,channel:null,date:E.date,ts:E.date===todayStr()?Date.now():new Date(E.date+"T12:00").getTime(),src:pre.src||"manual"});
         if(pre.onDone) pre.onDone();
         return;
       } else return;
       upd();
     });
     d.addEventListener("input",e=>{ if(e.target.id==="eNote") upd(); });
+    d.addEventListener("change",e=>{ if(e.target.id==="eDate" && e.target.value){ E.date = e.target.value>todayStr()?todayStr():e.target.value; e.target.value=E.date; upd(); } });
     upd();
   });
 }
@@ -1001,23 +946,6 @@ function simpleForm(title,fields,onSave,onDel){
     if(onDel) d.querySelector("#sfDel").onclick=()=>{ onDel(); persist(); closeDrawer(); render(); };
   });
 }
-function openStock(id){
-  const s = id ? S.stocks.find(x=>x.id===id) : {id:uid(),sym:"",name:"",shares:0,cost:0,price:0,prev:0,ccy:"TWD"};
-  let ccy=s.ccy;
-  simpleForm(id?`更新 ${esc(s.sym)}`:"新增持股",[
-    {html:`<div class="grid2"><label class="field">代號<input class="inp" id="sf_sym" value="${esc(s.sym)}" placeholder="0050"></label><label class="field">名稱<input class="inp" id="sf_name" value="${esc(s.name)}" placeholder="元大台灣50"></label></div>`},
-    {html:`<div class="chips" id="ccy"><button type="button" class="chip" data-c="TWD" aria-pressed="${ccy==="TWD"}">台幣</button><button type="button" class="chip" data-c="USD" aria-pressed="${ccy==="USD"}">美元</button></div>`},
-    {html:`<div class="grid2"><label class="field">股數<input class="inp num" id="sf_shares" inputmode="decimal" value="${s.shares||""}"></label><label class="field">成本均價<input class="inp num" id="sf_cost" inputmode="decimal" value="${s.cost||""}"></label></div>`},
-    {html:`<div class="grid2"><label class="field">今天收盤／現價<input class="inp num" id="sf_price" inputmode="decimal" value="${s.price||""}"></label><label class="field">昨收（算今日漲跌）<input class="inp num" id="sf_prev" inputmode="decimal" value="${s.prev||""}"></label></div><div class="label">改了現價，舊的現價會自動變成昨收；你也可以自己填。</div>`},
-    {k:"sym"},{k:"name"},{k:"shares",num:1},{k:"cost",num:1},{k:"price",num:1},{k:"prev",num:1},
-  ], v=>{
-    if(!v.sym){ toast("填一下代號"); return false; }
-    const prevAuto = (id && v.price!==s.price && v.prev===s.prev) ? s.price : v.prev;
-    const rec={...s,...v,ccy,prev:prevAuto||v.price};
-    const i=S.stocks.findIndex(x=>x.id===s.id); if(i>=0) S.stocks[i]=rec; else S.stocks.push(rec);
-  }, id?()=>{ S.stocks=S.stocks.filter(x=>x.id!==id); }:null);
-  const box=layer.querySelector("#ccy"); box.onclick=e=>{ const b=e.target.closest("[data-c]"); if(!b) return; ccy=b.dataset.c; box.querySelectorAll("[data-c]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.c===ccy)); };
-}
 function openAcc(id){
   const a = id ? S.accounts.find(x=>x.id===id) : {id:uid(),name:"",balance:0};
   simpleForm(id?"修改帳戶":"新增帳戶",[{k:"name",label:"名稱",v:a.name,ph:"例如：郵局"},{k:"balance",label:"目前餘額",v:a.balance,num:1}], v=>{
@@ -1057,12 +985,11 @@ document.addEventListener("click",e=>{
     case "filter": UI.bagFilter=b.dataset.bag||null; render(); break;
     case "editCard": openCardEdit(b.dataset.card); break;
     case "payCard": { const c=cardById(b.dataset.card), due=cardDue(c), acc=S.accounts[0]; if(acc) acc.balance-=due; const old=c.paidTs; c.paidTs=Date.now(); persist(); render(); toast(`${c.name} 卡費 ${fmt(due)} 繳清了`, ()=>{ c.paidTs=old; if(acc) acc.balance+=due; persist(); render(); }); break; }
-    case "editStock": openStock(b.dataset.id); break;
     case "editAcc": openAcc(b.dataset.id); break;
     case "editRes": { const k=b.dataset.k; simpleForm(k==="save"?"指定儲蓄":"安全緩衝",[{k:"v",label:"金額",v:S.reserves[k],num:1}],v=>{ S.reserves[k]=v.v; }); break; }
-    case "fx": simpleForm("美元匯率",[{k:"v",label:"1 美元 = 幾台幣",v:S.fx.USD,num:1}],v=>{ if(v.v>0) S.fx.USD=v.v; }); break;
     case "year": UI.year=Math.min(NOW.getFullYear(),UI.year+ +b.dataset.d); render(); break;
-    case "yearGo": UI.year=+b.dataset.y; render(); window.scrollTo(0,0); break;
+    case "yearGo": UI.year=+b.dataset.y; render(); document.getElementById("goals")?.scrollIntoView({behavior:"smooth"}); break;
+    case "toGoals": document.getElementById("goals")?.scrollIntoView({behavior:"smooth"}); break;
     case "editTarget": simpleForm(`${UI.year} 年存款目標`,[{k:"v",label:"今年想多存多少",v:S.goals.targets[UI.year]||"",num:1}],v=>{ S.goals.targets[UI.year]=v.v; }); break;
     case "editLog": { const m=b.dataset.m; simpleForm(`${m.replace("-"," 年 ")} 月底存款`,[{k:"v",label:"那個月底的存款",v:S.savingsLog[m]??"",num:1}],v=>{ S.savingsLog[m]=v.v; }, S.savingsLog[m]!=null?()=>{ delete S.savingsLog[m]; }:null); break; }
     case "editGoal": openGoal(b.dataset.id); break;
@@ -1070,7 +997,7 @@ document.addEventListener("click",e=>{
     case "clearSample": openDrawer(`${head("清空範例資料？")}<div>會刪掉範例的花費、卡片消費、股票和目標，保留預算袋和卡片設定讓你改成自己的。</div><div class="grid2"><button type="button" class="btn ghost" data-close>先不要</button><button type="button" class="btn warn" id="doClear">清空</button></div>`, d=>{ d.querySelector("#doClear").onclick=()=>{ S=blankState(); persist(); closeDrawer(); render(); toast(`乾乾淨淨，開始記帳吧 ${TH.hi}`); }; }); break;
   }
 });
-document.addEventListener("change",e=>{ if(e.target.id==="importFile" && e.target.files[0]){ importBackup(e.target.files[0]); e.target.value=""; return; } if(e.target.id==="incStk"){ S.goals.includeStocks=e.target.checked; persist(); render(); } });
+document.addEventListener("change",e=>{ if(e.target.id==="importFile" && e.target.files[0]){ importBackup(e.target.files[0]); e.target.value=""; return; } });
 function recordTxSilent(t){ S.txns.push(t); if(t.pay?.startsWith("acc:")){ const a=S.accounts.find(a=>a.id===t.pay.slice(4)); if(a) a.balance-=t.amt; } persist(); render(); }
 
 boot();
