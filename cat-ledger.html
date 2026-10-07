@@ -399,7 +399,7 @@ function sampleState(){
       {id:"sub",icon:"tv",name:"固定訂閱",budget:1000,channel:"網購",color:"#8ED8E0",items:DEFAULT_ITEMS.sub},
     ],
     accounts:[{id:"bank",name:"薪轉帳戶",balance:82400},{id:"cash",name:"錢包現金",balance:3150}],
-    reserves:{save:20000,buffer:10000},
+    reserves:{save:0,buffer:0},
     cards:[
       {id:"c1",name:"主力卡",last4:"8888",limit:80000,closeDay:5,payDay:20,paidTs:0,color:"#FF9DBB"},
       {id:"c2",name:"網購卡",last4:"1234",limit:50000,closeDay:15,payDay:3,paidTs:0,color:"#8EC3F0"},
@@ -504,8 +504,8 @@ function canSpend(){ const sp=spentBy(MONTH); return S.bags.reduce((s,b)=>s+Math
 function waterfall(){
   const acc=accTotal(), due=allCardDue(), gs=goalSaved(), cs=canSpend();
   const fp = fixedPending();
-  const un = acc - due - fp - gs - S.reserves.save - S.reserves.buffer - cs;
-  return {total:acc, rows:[["卡費待繳",due,"var(--danger)"],["固定支出（本月還沒扣）",fp,FIXED_COLOR],["目標專款",gs,color(4)],["指定儲蓄",S.reserves.save,color(2)],["安全緩衝",S.reserves.buffer,color(5)],["還沒分配",Math.max(0,un),"var(--ink-soft)"]], cs, un};
+  const un = acc - due - fp - gs - cs;
+  return {total:acc, rows:[["卡費待繳",due,"var(--danger)"],["固定支出（本月還沒扣）",fp,FIXED_COLOR],["目標專款",gs,color(4)],["還沒分配",Math.max(0,un),"var(--ink-soft)"]], cs, un};
 }
 const payLabel = p => { if(!p) return "現金"; const [k,id]=p.split(":"); if(k==="card"){ const c=cardById(id); return c?c.name:"已刪除的卡"; } const a=S.accounts.find(a=>a.id===id); return a?a.name:"帳戶"; };
 const txChannel = t => t.channel || channelOfMerchant(t.merchant) || bagOf(t.bag).channel || "一般";
@@ -738,12 +738,6 @@ function pageAssets(){
   ${sampleBar()}
   <div class="st"><h3>存款帳戶</h3><button type="button" class="link" data-act="editAcc">新增帳戶</button></div>
   <section class="sheet hold">${S.accounts.map(a=>`<button type="button" class="hr" data-act="editAcc" data-id="${a.id}"><span class="n row">${ic("piggy")} ${esc(a.name)}</span><span class="v num">${fmt(a.balance)}</span></button>`).join("")}</section>
-  <div class="st"><h3>先留起來的錢</h3></div>
-  <section class="sheet alt hold">
-    <button type="button" class="hr" data-act="editRes" data-k="save"><span class="n row">${ic("coin")} 指定儲蓄</span><span class="v num">${fmt(S.reserves.save)}</span><span class="d">每月發薪先存起來的錢，不算能花</span></button>
-    <button type="button" class="hr" data-act="editRes" data-k="buffer"><span class="n row">${ic("heart")} 安全緩衝</span><span class="v num">${fmt(S.reserves.buffer)}</span><span class="d">臨時急用的底，不算能花</span></button>
-    <button type="button" class="hr" data-act="toGoals"><span class="n row">${ic("flag")} 目標專款</span><span class="v num">${fmt(goalSaved())}</span><span class="d">在下面「存錢目標」管理</span></button>
-  </section>
   ${goalsSection()}
   ${backupSection()}`;
 }
@@ -1015,7 +1009,6 @@ document.addEventListener("click",e=>{
     case "editCard": openCardEdit(b.dataset.card); break;
     case "payCard": { const c=cardById(b.dataset.card), due=cardDue(c), acc=S.accounts[0]; if(acc) acc.balance-=due; const old=c.paidTs; c.paidTs=Date.now(); persist(); render(); toast(`${c.name} 卡費 ${fmt(due)} 繳清了`, ()=>{ c.paidTs=old; if(acc) acc.balance+=due; persist(); render(); }); break; }
     case "editAcc": openAcc(b.dataset.id); break;
-    case "editRes": { const k=b.dataset.k; simpleForm(k==="save"?"指定儲蓄":"安全緩衝",[{k:"v",label:"金額",v:S.reserves[k],num:1}],v=>{ S.reserves[k]=v.v; }); break; }
     case "year": UI.year=Math.min(NOW.getFullYear(),UI.year+ +b.dataset.d); render(); break;
     case "yearGo": UI.year=+b.dataset.y; render(); document.getElementById("goals")?.scrollIntoView({behavior:"smooth"}); break;
     case "toGoals": document.getElementById("goals")?.scrollIntoView({behavior:"smooth"}); break;
