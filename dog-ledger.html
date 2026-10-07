@@ -484,7 +484,7 @@ const goalSaved = () => S.goals.items.reduce((s,g)=>s+g.saved,0);
 const cardById = id => S.cards.find(c=>c.id===id);
 const cardDue = c => S.txns.filter(t=>t.pay==="card:"+c.id && t.ts>c.paidTs).reduce((s,t)=>s+t.amt,0);
 const allCardDue = () => S.cards.reduce((s,c)=>s+cardDue(c),0);
-const savingsNow = () => accTotal() - allCardDue();
+const savingsNow = () => accTotal();   // 卡費待繳不扣，只看帳戶餘額
 function canSpend(){ const sp=spentBy(MONTH); return S.bags.reduce((s,b)=>s+Math.max(0,b.budget-(sp[b.id]||0)),0); }
 function waterfall(){
   const acc=accTotal(), due=allCardDue(), gs=goalSaved(), cs=canSpend();
@@ -752,7 +752,7 @@ function goalsSection(){
     <div class="foot"><span>起點（去年底）<b>${fmt(info.base)}</b></span><span>最新 <b>${fmt(info.latest)}</b></span></div>
     <div class="months" style="margin-top:8px">${info.vals.map((v,i)=>{ const pv = i? info.vals[i-1] : info.base; const d = v!=null && pv!=null ? v-pv : null; const isNow = Y===NOW.getFullYear()&&i===NOW.getMonth();
       return `<button type="button" class="mo ${isNow?"now":""} ${v==null?"none":""}" data-act="editLog" data-m="${Y}-${pad(i+1)}" ${isNow?"disabled":""}>${i+1} 月${isNow?"（自動）":""}<span class="num">${v==null?"—":fmt(v)}</span>${d!=null?`<span class="${d>=0?"down":"up"}">${d>=0?"▲":"▼"} ${fmt(Math.abs(d))}</span>`:""}</button>`; }).join("")}</div>
-    <div class="label" style="margin-top:6px">存款 = 各帳戶加總 − 卡費待繳。這個月的數字會自動更新，過去的月份可以點進去補。</div>
+    <div class="label" style="margin-top:6px">存款 = 各帳戶餘額加總（卡費待繳不扣，繳卡費時帳戶扣款才會減少）。這個月的數字會自動更新，過去的月份可以點進去補。</div>
   </section>
   <div class="st"><h3>目標專款</h3><button type="button" class="link" data-act="editGoal">新增目標</button></div>
   <section class="sheet">${S.goals.items.length?S.goals.items.map((g,i)=>{ const p=g.target?Math.min(100,g.saved/g.target*100):0; return `<div class="gi">
